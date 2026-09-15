@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "demo:world": "node src/world/demo.js",
+    "demo:characters": "node src/characters/demo.js",
     "test": "node --test"
   },
   "license": "UNLICENSED"
