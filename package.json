@@ -1,0 +1,12 @@
+{
+  "name": "freeworld",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Freeworld - เกมจำลองระบบนิเวศ",
+  "type": "module",
+  "scripts": {
+    "demo:world": "node src/world/demo.js",
+    "test": "node --test"
+  },
+  "license": "UNLICENSED"
+}
