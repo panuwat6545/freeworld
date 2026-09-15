@@ -7,6 +7,7 @@
   "scripts": {
     "demo:world": "node src/world/demo.js",
     "demo:characters": "node src/characters/demo.js",
+    "demo:building": "node src/building/demo.js",
     "test": "node --test"
   },
   "license": "UNLICENSED"

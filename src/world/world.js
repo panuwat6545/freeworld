@@ -12,6 +12,7 @@ export class World {
     this.height = height;
     this.tick = 0;
     this.grid = new Grid(width, height);
+    this.structures = []; // สิ่งก่อสร้างทั้งหมดที่ถูกสร้างในโลกนี้ (ดู src/building)
     generateWorld(this.grid, { seed, density });
   }
 

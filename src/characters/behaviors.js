@@ -1,4 +1,7 @@
 import { RESOURCE_TYPES } from '../world/resource-types.js';
+import { BLUEPRINTS } from '../building/blueprints.js';
+import { build } from '../building/crafting.js';
+import { isNearStructureType } from '../building/structure-finder.js';
 import { NEEDS_CONFIG } from './needs-config.js';
 import { clampNeedValue } from './character.js';
 import { stepToward, isAdjacentOrSame } from './movement.js';
@@ -8,6 +11,7 @@ export const BEHAVIORS = Object.freeze({
   SEEK_FOOD: 'seek_food',
   REST: 'rest',
   GATHER_WOOD: 'gather_wood',
+  BUILD_SHELTER: 'build_shelter',
   SOCIALIZE: 'socialize',
 });
 
@@ -24,13 +28,20 @@ function seekFood(character, world) {
   }
 }
 
-// energy ต่ำ -> หยุดพัก ฟื้นพลังงานบางส่วน (ยังไม่มีที่พักจริงจนกว่าจะถึงเฟส 3)
-function rest(character) {
-  character.needs.energy = clampNeedValue(character.needs.energy + NEEDS_CONFIG.ENERGY_REST_RECOVERY);
+// energy ต่ำ -> หยุดพัก ฟื้นพลังงานบางส่วน ถ้าอยู่ใกล้ "ที่พัก" ที่สร้างไว้แล้วจะฟื้นเร็วขึ้น
+function rest(character, world) {
+  const shelterBlueprint = BLUEPRINTS.shelter;
+  const nearShelter = isNearStructureType(
+    world,
+    character.position,
+    shelterBlueprint.id,
+    shelterBlueprint.effects.nearbyRadius,
+  );
+  const recovery = NEEDS_CONFIG.ENERGY_REST_RECOVERY + (nearShelter ? shelterBlueprint.effects.restRecoveryBonus : 0);
+  character.needs.energy = clampNeedValue(character.needs.energy + recovery);
 }
 
-// shelter ต่ำ -> เดินไปเก็บไม้สะสมไว้เป็น placeholder สำหรับระบบสร้างสิ่งปลูกสร้างในเฟส 3
-// หมายเหตุ: การเก็บไม้ในเฟสนี้ยังไม่ทำให้ค่า shelter ฟื้นกลับ เพราะยังไม่มีสิ่งปลูกสร้างจริงให้ "อยู่อาศัย"
+// shelter ต่ำ (และยังเก็บทรัพยากรไม่ครบสูตรที่พัก) -> เดินไปเก็บไม้สะสมไว้ใน inventory
 function gatherWood(character, world) {
   const targetCell = findNearestResourceCell(world, character.position, RESOURCE_TYPES.WOOD);
   if (!targetCell) return;
@@ -41,6 +52,11 @@ function gatherWood(character, world) {
   } else {
     character.position = stepToward(character.position, targetCell);
   }
+}
+
+// shelter ต่ำ (และเก็บทรัพยากรครบสูตรที่พักแล้ว) -> สร้างที่พักลงบน grid ที่ตำแหน่งปัจจุบัน แล้วหักทรัพยากรออกจาก inventory
+function buildShelter(character, world) {
+  build(character, world, BLUEPRINTS.shelter.id);
 }
 
 // social ต่ำ -> เดินเข้าใกล้ตัวละครอื่นที่ใกล้ที่สุด แล้วปฏิสัมพันธ์เมื่ออยู่ติดกัน
@@ -59,6 +75,7 @@ export const BEHAVIOR_HANDLERS = Object.freeze({
   [BEHAVIORS.SEEK_FOOD]: seekFood,
   [BEHAVIORS.REST]: rest,
   [BEHAVIORS.GATHER_WOOD]: gatherWood,
+  [BEHAVIORS.BUILD_SHELTER]: buildShelter,
   [BEHAVIORS.SOCIALIZE]: socialize,
 });
 
