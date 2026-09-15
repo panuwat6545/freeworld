@@ -8,7 +8,11 @@
     "demo:world": "node src/world/demo.js",
     "demo:characters": "node src/characters/demo.js",
     "demo:building": "node src/building/demo.js",
+    "demo:storage": "node src/storage/demo.js",
     "test": "node --test"
   },
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "dependencies": {
+    "googleapis": "^181.0.0"
+  }
 }

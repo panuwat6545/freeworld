@@ -122,6 +122,73 @@ npm test                # รวม unit test ของเฟส 1-3 (ใช้ 
 - ผ่าน `utility-ai` ตัวละครเลือกพฤติกรรม `build_shelter` เองอัตโนมัติทันทีที่เก็บไม้ครบสูตร
 - พฤติกรรม "พัก" ฟื้นพลังงานเร็วขึ้นจริงเมื่ออยู่ใกล้ที่พัก เทียบกับพักเฉยๆ ที่ไม่มีที่พักอยู่ใกล้
 
+## เฟส 5 — บันทึกข้อมูลลง Google Drive (เสร็จแล้ว)
+
+> ข้ามเฟส 4 (ระบบสังคม/ขยายเผ่าพันธุ์) เพราะเฟส 4 ถูกระบุไว้ว่า "ถ้าต้องการ" (optional) และยังไม่มีคำสั่งให้ทำ
+> จึงพัฒนาต่อจากเฟส 3 ไปเฟส 5 ตามคำสั่งของผู้ดูแลโปรเจกต์โดยตรง
+
+เพิ่มระบบบันทึกสถานะโลก ("snapshot") เป็นไฟล์ JSON ขึ้น Google Drive ผ่าน service account
+โดยอ่าน credential จาก environment variable `GOOGLE_DRIVE_CREDENTIALS` (JSON string) เท่านั้น
+ไม่มีการ hardcode หรือเขียนคีย์ลงไฟล์ใดๆ ในโค้ดหรือ commit
+
+Snapshot object ประกอบด้วย field ตามสเปกในข้อ 6 ของ `docs/work-instruction.md` เป็นอย่างน้อย:
+`timestamp`, `gameYear`, `worldState` (tick, ขนาด grid, ทรัพยากรทุกจุดบน grid, สิ่งก่อสร้างทั้งหมด)
+และ `characterCount` — ส่วนข้อมูลตัวละครสรุปแบบสั้นๆ พอ (id, ตำแหน่ง, needs ปัดทศนิยม, inventory,
+พฤติกรรมปัจจุบัน) ไม่เอา field ภายในทุกตัว เพื่อไม่ให้ไฟล์ใหญ่เกินจำเป็น
+
+ไฟล์จะถูกอัปโหลดเข้าโฟลเดอร์ `/freeworld-ecosystem/snapshots` บน Drive ชื่อไฟล์รูปแบบ
+`snapshot_YYYY-MM-DD_HHmm.json` (เวลาแบบ UTC) ถ้าโฟลเดอร์ตามลำดับยังไม่มีอยู่จริงจะสร้างให้อัตโนมัติ
+การบันทึกจะถูกเรียกอัตโนมัติทุกครั้งที่เวลาในเกมผ่านไปครบ 1 ปี โดยผูกกับ `world.tick` ที่มีอยู่แล้ว
+(ไม่ต้องแก้ `World` class) ผ่าน `SnapshotScheduler`
+
+ทุกจุดที่คุยกับ Google Drive API ถูกครอบด้วย try/catch: ถ้า credential ผิด รูปแบบไม่ถูกต้อง หรือ
+Drive API error (เช่น permission ไม่พอ) จะ log ข้อความที่เข้าใจง่ายแล้วคืนค่า `{ success: false, error }`
+**ไม่ throw ออกไป** เพื่อไม่ให้เกมทั้งตัวล่ม
+
+โครงสร้างไฟล์ที่เกี่ยวข้อง:
+
+```
+src/storage/
+  drive-client.js       -> อ่าน credential จาก env, สร้าง Google Drive client (service account),
+                             ensureFolderPath หา/สร้างโฟลเดอร์ตามลำดับ path อัตโนมัติ
+  snapshot.js             -> buildSnapshot ประกอบ object ตามสเปก, formatSnapshotFilename ตั้งชื่อไฟล์
+  save-snapshot.js          -> saveSnapshot: ประกอบ snapshot + อัปโหลดขึ้น Drive พร้อม error handling
+                                 (รับ deps แบบ inject ได้เพื่อ mock ตอน test)
+  snapshot-scheduler.js       -> SnapshotScheduler: เรียก saveSnapshot อัตโนมัติทุกครั้งที่ครบ 1 ปีเกม
+  demo.js                       -> สคริปต์สาธิตจำลอง 3 ปี ใช้ credential จริงจาก env ยืนยันการเชื่อมต่อ Drive
+```
+
+### วิธีทดสอบ
+
+```bash
+npm run demo:storage # รันจำลอง 3 ปีในเกม (ย่อเหลือปีละ 20 tick เพื่อให้ demo จบไว) ใช้ credential จริง
+                      # จาก GOOGLE_DRIVE_CREDENTIALS แสดง log ว่าบันทึกไฟล์ชื่ออะไรสำเร็จ/ไม่สำเร็จ
+npm test              # รวม unit test ของเฟส 1, 2, 3, 5 (ใช้ node:test, mock Google Drive API ทั้งหมด
+                      # ไม่ยิง API จริงตอนรัน test)
+```
+
+`npm test` ของเฟส 5 ตรวจสอบว่า:
+- `formatSnapshotFilename` ตั้งชื่อไฟล์ตรงตามรูปแบบ `snapshot_YYYY-MM-DD_HHmm.json` ครบทุกกรณี (รวมเติม 0 นำหน้า)
+- `buildSnapshot` ประกอบ object ครบตามสเปก มี `timestamp` / `gameYear` / `worldState` / `characterCount`
+  และสรุปข้อมูลตัวละครแบบย่อถูกต้อง
+- `saveSnapshot` อัปโหลดผ่าน mock Drive client ได้ถูกต้อง (ตั้งชื่อไฟล์ถูก, เนื้อหาไฟล์ตรงกับ snapshot ที่ประกอบไว้)
+  โดยไม่ยิง API จริง
+- `saveSnapshot` จัดการ error โดยไม่ throw ทั้งกรณี Drive API ล้มเหลว และกรณีไม่มี/credential ผิดรูปแบบ
+- `ensureFolderPath` หาโฟลเดอร์เดิมถ้ามีอยู่แล้ว หรือสร้างใหม่ตามลำดับ path ถ้ายังไม่มี
+- `SnapshotScheduler` เรียก `saveSnapshot` อัตโนมัติทุกครั้งที่ `world.tick` ผ่านไปครบ 1 ปีเกมพอดี
+
+### หมายเหตุสำคัญจากการทดสอบเชื่อมต่อจริง
+
+รัน `npm run demo:storage` ด้วย credential จริงแล้วต่อ Google Drive API ได้สำเร็จ (ไม่ใช่ปัญหาโค้ดหรือ
+credential ผิด) แต่ Drive ตอบกลับ error ว่า **"Service Accounts do not have storage quota"** — เป็นข้อจำกัด
+มาตรฐานของ Google ที่ service account เปล่าๆ ไม่มีพื้นที่เก็บไฟล์เป็นของตัวเอง ต้องเลือกอย่างใดอย่างหนึ่ง:
+1. สร้าง **Shared Drive** แล้วเชิญ service account (ดู `client_email` ใน credential) เข้าเป็นสมาชิกแบบ Content Manager
+2. ตั้งค่า **Domain-wide delegation** ให้ service account สวมสิทธิ์บัญชีผู้ใช้จริงใน Workspace
+
+โค้ดฝั่งนี้รองรับ Shared Drive ไว้แล้ว (`supportsAllDrives`, `includeItemsFromAllDrives`, `corpora: 'allDrives'`)
+เหลือเพียงตั้งค่าฝั่ง Google Workspace/Cloud Console ตามข้อใดข้อหนึ่งข้างต้น ก็จะบันทึก snapshot ได้จริง
+โดยไม่ต้องแก้โค้ดเพิ่ม
+
 ## เฟสถัดไป
 
 ดูลำดับเฟสทั้งหมดและ Definition of Done ได้ที่ `docs/work-instruction.md`
