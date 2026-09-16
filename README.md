@@ -194,15 +194,30 @@ npm test              # รวม unit test ของเฟส 1, 2, 3, 5 (ใ�
 account เดิม เพราะบัญชี Gmail ส่วนตัวใช้ Shared Drive ไม่ได้ โค้ดฝั่งนี้อัปเดตให้รองรับทั้งสองรูปแบบแล้ว
 (เลือก auth อัตโนมัติจาก field `type`) และเอา `supportsAllDrives` ออกจาก upload call เพราะไม่จำเป็นอีกต่อไป
 
-ครั้งล่าสุดที่รัน `npm run demo:storage` ใน session นี้ ตัวแปร `GOOGLE_DRIVE_CREDENTIALS` ที่ session อ่านได้
-**ยังเป็น credential แบบ `service_account` เดิม** (ยังไม่ใช่ `authorized_user` ใหม่ — environment variable
-ของ session จะถูกกำหนดตอนเริ่ม session เท่านั้น การอัปเดตค่าที่อื่นจึงยังไม่ถูกอ่านเข้ามาจนกว่าจะเปิด session
-ใหม่) ผลคือได้ error `"Project #5505543463 has been deleted"` จาก Google (โปรเจกต์ GCP ของ service account
-เดิมถูกลบไปแล้ว) — ยืนยันได้ว่า **ไม่ใช่บั๊กของโค้ด** เพราะ error เปลี่ยนจาก "ไม่มี storage quota" (ของเดิม)
-เป็น error เกี่ยวกับโปรเจกต์ถูกลบ ซึ่งเป็นเรื่องของ credential ที่ยังไม่อัปเดต ไม่ใช่ logic ในโค้ด
+**ยืนยันแล้ว (session ใหม่):** เปิด session ใหม่แล้วรัน `npm run demo:storage` อีกครั้ง คราวนี้ environment
+variable `GOOGLE_DRIVE_CREDENTIALS` ที่ session อ่านได้เป็น credential แบบ `authorized_user` จริง (มี
+`client_id` / `client_secret` / `refresh_token` ครบ) — `getDriveClient` เลือกใช้ `google.auth.OAuth2` ตามที่
+ออกแบบไว้ได้ถูกต้อง ไม่มีการล่มหรือ error เรื่อง credential ผิดรูปแบบเหมือนครั้งก่อนอีกต่อไป ยืนยันได้ว่า
+**การรองรับ credential แบบ `authorized_user` ในโค้ดทำงานถูกต้อง**
 
-**ต้องทำต่อ:** เปิด session ใหม่ (ให้ environment variable `GOOGLE_DRIVE_CREDENTIALS` ที่เป็น `authorized_user`
-ถูกอ่านเข้ามาจริง) แล้วรัน `npm run demo:storage` อีกครั้งเพื่อยืนยันว่าบันทึกไฟล์ขึ้น Drive ส่วนตัวได้จริง
+อย่างไรก็ตาม การอัปโหลด snapshot จริงยัง **ไม่สำเร็จ** ในการทดสอบครั้งนี้ ด้วย error ใหม่ (ต่างจากครั้งก่อน):
+
+```
+Google Drive API has not been used in project 1070078689033 before or it is disabled.
+```
+
+เลข `1070078689033` คือหมายเลขโปรเจกต์ GCP ของ OAuth client เอง (ตรงกับ prefix ของ `client_id` ที่ใช้) —
+สาเหตุคือ **ยังไม่ได้เปิดใช้งาน Google Drive API ในโปรเจกต์ GCP นี้** ไม่ใช่บั๊กของโค้ด เพราะ:
+- error เปลี่ยนไปอีกขั้นจากครั้งก่อน (จาก "โปรเจกต์ของ service account เดิมถูกลบ" มาเป็น "API ยังไม่ถูกเปิดใช้
+  ในโปรเจกต์ของ OAuth client ใหม่") แสดงว่า auth ผ่านขั้นตอนเดิมไปได้แล้ว และไปสะดุดที่ขั้นถัดไปซึ่งเป็นเรื่อง
+  การตั้งค่าฝั่ง Google Cloud Console
+- `saveSnapshot` จับ error และคืนค่า `{ success: false, error }` ตามสเปกได้ถูกต้อง สคริปต์ demo รันจบครบ 3 ปี
+  โดยไม่ล่ม (ตามที่ error handling ควรทำงาน)
+
+**ต้องทำต่อ:** เข้า Google Cloud Console ของโปรเจกต์ `1070078689033` แล้วเปิดใช้งาน Drive API ที่
+`https://console.developers.google.com/apis/api/drive.googleapis.com/overview?project=1070078689033`
+รอสักครู่ให้การเปิดใช้งานมีผล จากนั้นรัน `npm run demo:storage` อีกครั้งเพื่อยืนยันว่าบันทึกไฟล์ขึ้น Drive
+ส่วนตัวได้จริง
 
 ## เฟสถัดไป
 
