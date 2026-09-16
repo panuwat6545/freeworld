@@ -3,7 +3,7 @@ export const BLUEPRINTS = Object.freeze({
   shelter: Object.freeze({
     id: 'shelter',
     name: 'ที่พัก',
-    cost: Object.freeze({ wood: 10 }),
+    cost: Object.freeze({ wood: 25 }),
     effects: Object.freeze({
       // พลังงานที่ฟื้นเพิ่มขึ้นต่อ tick (นอกเหนือจากอัตราพักเฉยๆ) เมื่อพักใกล้ที่พักนี้
       restRecoveryBonus: 6,

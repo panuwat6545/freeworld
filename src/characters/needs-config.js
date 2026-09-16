@@ -9,7 +9,7 @@ export const NEEDS_CONFIG = Object.freeze({
   DECAY_RATE: Object.freeze({
     hunger: 1.5,
     energy: 1.0,
-    shelter: 0.6,
+    shelter: 0.005, // ลดจากเดิม (0.6) ~99% (ลองแค่ 40% แล้วยังสูงเกินเป้า ต้องลดมากกว่านั้นมาก - ดูเหตุผลใน README)
     social: 0.4,
   }),
   ENERGY_REST_RECOVERY: 4, // พลังงานที่ฟื้นกลับต่อ tick เมื่อหยุดพัก

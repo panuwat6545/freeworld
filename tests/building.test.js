@@ -20,9 +20,10 @@ function makeControlledWorld(width, height) {
 
 test('hasEnoughResources ตรวจสูตรถูกต้องตามจำนวนที่มีใน inventory', () => {
   const blueprint = BLUEPRINTS.shelter;
-  assert.equal(hasEnoughResources({ wood: 9 }, blueprint), false);
-  assert.equal(hasEnoughResources({ wood: 10 }, blueprint), true);
-  assert.equal(hasEnoughResources({ wood: 20 }, blueprint), true);
+  const cost = blueprint.cost.wood;
+  assert.equal(hasEnoughResources({ wood: cost - 1 }, blueprint), false);
+  assert.equal(hasEnoughResources({ wood: cost }, blueprint), true);
+  assert.equal(hasEnoughResources({ wood: cost * 2 }, blueprint), true);
 });
 
 test('gatherWood behavior สะสมไม้เข้า inventory เมื่อเก็บเกี่ยวสำเร็จ', () => {
@@ -43,26 +44,29 @@ test('gatherWood behavior สะสมไม้เข้า inventory เมื�
 });
 
 test('canBuild คืนค่า true เมื่อ inventory ครบสูตร และ false เมื่อไม่ครบ', () => {
+  const shelterCost = BLUEPRINTS.shelter.cost.wood;
+
   const characterPoor = new Character({ needs: {} });
   characterPoor.inventory.wood = 5;
   assert.equal(canBuild(characterPoor, 'shelter'), false);
 
   const characterRich = new Character({ needs: {} });
-  characterRich.inventory.wood = 10;
+  characterRich.inventory.wood = shelterCost;
   assert.equal(canBuild(characterRich, 'shelter'), true);
 });
 
 test('build หักทรัพยากรออกจาก inventory และวางสิ่งก่อสร้างลงบนโลกที่ตำแหน่งตัวละคร', () => {
   const world = makeControlledWorld(5, 5);
   const character = new Character({ x: 3, y: 2, needs: {} });
-  character.inventory.wood = 25;
+  const shelterCost = BLUEPRINTS.shelter.cost.wood;
+  character.inventory.wood = shelterCost + 15;
 
   const structure = build(character, world, 'shelter');
 
   assert.ok(structure instanceof Structure);
   assert.equal(structure.type, 'shelter');
   assert.deepEqual(structure.position, { x: 3, y: 2 });
-  assert.equal(character.inventory.wood, 15); // 25 - 10 ตามสูตร
+  assert.equal(character.inventory.wood, 15); // เหลือ 15 หลังหักตามสูตร
   assert.equal(world.structures.length, 1);
   assert.equal(world.structures[0], structure);
 });
@@ -101,7 +105,7 @@ test('ตัวละครสร้างที่พักอัตโนม�
   const character = new Character({ x: 0, y: 0, needs: { hunger: 100, energy: 100, shelter: 5, social: 100 } });
 
   let built = false;
-  for (let i = 0; i < 5 && !built; i++) {
+  for (let i = 0; i < 10 && !built; i++) {
     const behavior = updateCharacter(character, world, [character], 1);
     if (behavior === BEHAVIORS.BUILD_SHELTER) built = true;
   }
@@ -109,7 +113,8 @@ test('ตัวละครสร้างที่พักอัตโนม�
   assert.ok(built, 'ควรเลือกพฤติกรรม build_shelter เมื่อไม้ครบสูตร');
   assert.equal(world.structures.length, 1);
   assert.equal(world.structures[0].type, 'shelter');
-  assert.equal(character.inventory.wood, 0); // เก็บได้พอดี 10 แล้วหักหมดตอนสร้าง
+  // เก็บไม้ทีละ WOOD_HARVEST_QUANTITY (10) จนครบ/เกินสูตรที่พัก (25) แล้วหักตามสูตรตอนสร้าง
+  assert.ok(character.inventory.wood < 10, 'ไม้ที่เหลือควรน้อยกว่าปริมาณที่เก็บได้ต่อครั้ง');
 });
 
 test('buildShelter ฟื้นค่า need shelter กลับขึ้นมาหลังสร้างสำเร็จ (กันบั๊กค้างที่ 0 ตลอดกาล)', () => {

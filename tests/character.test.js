@@ -22,7 +22,10 @@ test('decayNeeds ลดค่าตามอัตรา decay ของแต�
 
 test('decayNeeds ไม่ทำให้ค่าต่ำกว่า 0', () => {
   const character = new Character({ needs: { hunger: 1, energy: 1, shelter: 1, social: 1 } });
-  character.decayNeeds(100);
+  // จำนวน tick ต้องมากพอให้ decay ของ need ที่ลดช้าที่สุด (เช่น shelter ที่ tune ให้ลดช้ามาก) ดันค่าลงถึง 0 ได้จริง
+  const minDecayRate = Math.min(...Object.values(NEEDS_CONFIG.DECAY_RATE));
+  const enoughTicks = Math.ceil(1 / minDecayRate) + 10;
+  character.decayNeeds(enoughTicks);
   for (const value of Object.values(character.needs)) {
     assert.equal(value, 0);
   }
