@@ -6,12 +6,13 @@ const FOLDER_MIME_TYPE = 'application/vnd.google-apps.folder';
 let cachedDriveClient = null;
 
 // อ่าน credential จาก environment variable เท่านั้น ห้าม hardcode หรือเขียนคีย์ลงไฟล์ใดๆ
-function loadServiceAccountCredentials() {
+// รองรับได้ทั้ง 2 รูปแบบ แยกกันด้วย field "type":
+// - "service_account" -> คีย์ของ service account (ใช้กับ Google Workspace + Shared Drive)
+// - "authorized_user"  -> OAuth2 refresh token (ใช้กับบัญชี Gmail ส่วนตัว ไม่มี Shared Drive)
+function loadCredentials() {
   const raw = process.env.GOOGLE_DRIVE_CREDENTIALS;
   if (!raw) {
-    throw new Error(
-      'ไม่พบ environment variable GOOGLE_DRIVE_CREDENTIALS (ต้องเป็น JSON string ของ service account key)',
-    );
+    throw new Error('ไม่พบ environment variable GOOGLE_DRIVE_CREDENTIALS (ต้องเป็น JSON string ของ credential)');
   }
 
   try {
@@ -21,12 +22,37 @@ function loadServiceAccountCredentials() {
   }
 }
 
-// สร้าง (หรือคืนค่า client เดิมที่แคชไว้) Google Drive API client แบบ authenticate ด้วย service account
+// สร้าง auth client ให้ตรงกับชนิด credential ตาม field "type"
+function createAuthClient(credentials) {
+  const { type } = credentials;
+
+  if (type === 'authorized_user') {
+    if (!credentials.client_id || !credentials.client_secret || !credentials.refresh_token) {
+      throw new Error(
+        'GOOGLE_DRIVE_CREDENTIALS ชนิด authorized_user ต้องมี client_id, client_secret และ refresh_token ครบ',
+      );
+    }
+    const oauth2Client = new google.auth.OAuth2(credentials.client_id, credentials.client_secret);
+    oauth2Client.setCredentials({ refresh_token: credentials.refresh_token });
+    return oauth2Client;
+  }
+
+  if (type === 'service_account') {
+    return new google.auth.GoogleAuth({ credentials, scopes: DRIVE_SCOPES });
+  }
+
+  throw new Error(
+    `GOOGLE_DRIVE_CREDENTIALS มี field "type" ที่ไม่รู้จัก: "${type}" (รองรับเฉพาะ "service_account" หรือ "authorized_user")`,
+  );
+}
+
+// สร้าง (หรือคืนค่า client เดิมที่แคชไว้) Google Drive API client โดยเลือกวิธี authenticate ให้ตรงกับ
+// รูปแบบ credential ที่อ่านได้จาก environment variable โดยอัตโนมัติ
 export function getDriveClient() {
   if (cachedDriveClient) return cachedDriveClient;
 
-  const credentials = loadServiceAccountCredentials();
-  const auth = new google.auth.GoogleAuth({ credentials, scopes: DRIVE_SCOPES });
+  const credentials = loadCredentials();
+  const auth = createAuthClient(credentials);
   cachedDriveClient = google.drive({ version: 'v3', auth });
   return cachedDriveClient;
 }

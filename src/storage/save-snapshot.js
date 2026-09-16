@@ -32,7 +32,6 @@ export async function saveSnapshot(world, characters, gameYear, deps = {}) {
         body: JSON.stringify(snapshot, null, 2),
       },
       fields: 'id, name',
-      supportsAllDrives: true,
     });
 
     console.log(`[storage] บันทึก snapshot สำเร็จ: ${fileName} (fileId=${response.data.id})`);

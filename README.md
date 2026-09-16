@@ -127,9 +127,17 @@ npm test                # รวม unit test ของเฟส 1-3 (ใช้ 
 > ข้ามเฟส 4 (ระบบสังคม/ขยายเผ่าพันธุ์) เพราะเฟส 4 ถูกระบุไว้ว่า "ถ้าต้องการ" (optional) และยังไม่มีคำสั่งให้ทำ
 > จึงพัฒนาต่อจากเฟส 3 ไปเฟส 5 ตามคำสั่งของผู้ดูแลโปรเจกต์โดยตรง
 
-เพิ่มระบบบันทึกสถานะโลก ("snapshot") เป็นไฟล์ JSON ขึ้น Google Drive ผ่าน service account
-โดยอ่าน credential จาก environment variable `GOOGLE_DRIVE_CREDENTIALS` (JSON string) เท่านั้น
-ไม่มีการ hardcode หรือเขียนคีย์ลงไฟล์ใดๆ ในโค้ดหรือ commit
+เพิ่มระบบบันทึกสถานะโลก ("snapshot") เป็นไฟล์ JSON ขึ้น Google Drive โดยอ่าน credential จาก
+environment variable `GOOGLE_DRIVE_CREDENTIALS` (JSON string) เท่านั้น ไม่มีการ hardcode หรือเขียนคีย์
+ลงไฟล์ใดๆ ในโค้ดหรือ commit
+
+รองรับ credential ได้ 2 รูปแบบ โดยเลือก auth ให้ถูกอัตโนมัติจาก field `"type"` ในตัว credential เอง:
+- **`service_account`** — คีย์ของ service account (ของเดิม เหมาะกับ Google Workspace ที่ใช้ Shared Drive ได้)
+- **`authorized_user`** — OAuth2 client_id/client_secret/refresh_token (สำหรับบัญชี Gmail ส่วนตัวที่ไม่มี
+  Shared Drive ให้ใช้ — เป็นค่าปัจจุบันของโปรเจกต์นี้)
+
+ถ้า field `type` เป็นค่าอื่นที่ไม่รู้จัก หรือ credential ขาด field ที่จำเป็นของแต่ละรูปแบบ ระบบจะโยน error
+ข้อความชัดเจนบอกว่าขาดอะไร (ถูก `saveSnapshot` ครอบ try/catch ไว้อีกชั้นเพื่อไม่ให้เกมล่ม)
 
 Snapshot object ประกอบด้วย field ตามสเปกในข้อ 6 ของ `docs/work-instruction.md` เป็นอย่างน้อย:
 `timestamp`, `gameYear`, `worldState` (tick, ขนาด grid, ทรัพยากรทุกจุดบน grid, สิ่งก่อสร้างทั้งหมด)
@@ -149,7 +157,8 @@ Drive API error (เช่น permission ไม่พอ) จะ log ข้อ�
 
 ```
 src/storage/
-  drive-client.js       -> อ่าน credential จาก env, สร้าง Google Drive client (service account),
+  drive-client.js       -> อ่าน credential จาก env, เลือก auth (service_account / authorized_user)
+                             ตาม field "type" อัตโนมัติ, สร้าง Google Drive client,
                              ensureFolderPath หา/สร้างโฟลเดอร์ตามลำดับ path อัตโนมัติ
   snapshot.js             -> buildSnapshot ประกอบ object ตามสเปก, formatSnapshotFilename ตั้งชื่อไฟล์
   save-snapshot.js          -> saveSnapshot: ประกอบ snapshot + อัปโหลดขึ้น Drive พร้อม error handling
@@ -174,20 +183,26 @@ npm test              # รวม unit test ของเฟส 1, 2, 3, 5 (ใ�
 - `saveSnapshot` อัปโหลดผ่าน mock Drive client ได้ถูกต้อง (ตั้งชื่อไฟล์ถูก, เนื้อหาไฟล์ตรงกับ snapshot ที่ประกอบไว้)
   โดยไม่ยิง API จริง
 - `saveSnapshot` จัดการ error โดยไม่ throw ทั้งกรณี Drive API ล้มเหลว และกรณีไม่มี/credential ผิดรูปแบบ
+- `getDriveClient` สร้าง client ได้ถูกต้องทั้ง 2 รูปแบบ credential (`service_account` และ `authorized_user`)
+  และโยน error ข้อความชัดเจนเมื่อ `authorized_user` ขาด field ที่จำเป็น หรือ `type` เป็นค่าที่ไม่รู้จัก
 - `ensureFolderPath` หาโฟลเดอร์เดิมถ้ามีอยู่แล้ว หรือสร้างใหม่ตามลำดับ path ถ้ายังไม่มี
 - `SnapshotScheduler` เรียก `saveSnapshot` อัตโนมัติทุกครั้งที่ `world.tick` ผ่านไปครบ 1 ปีเกมพอดี
 
 ### หมายเหตุสำคัญจากการทดสอบเชื่อมต่อจริง
 
-รัน `npm run demo:storage` ด้วย credential จริงแล้วต่อ Google Drive API ได้สำเร็จ (ไม่ใช่ปัญหาโค้ดหรือ
-credential ผิด) แต่ Drive ตอบกลับ error ว่า **"Service Accounts do not have storage quota"** — เป็นข้อจำกัด
-มาตรฐานของ Google ที่ service account เปล่าๆ ไม่มีพื้นที่เก็บไฟล์เป็นของตัวเอง ต้องเลือกอย่างใดอย่างหนึ่ง:
-1. สร้าง **Shared Drive** แล้วเชิญ service account (ดู `client_email` ใน credential) เข้าเป็นสมาชิกแบบ Content Manager
-2. ตั้งค่า **Domain-wide delegation** ให้ service account สวมสิทธิ์บัญชีผู้ใช้จริงใน Workspace
+**อัปเดต:** โปรเจกต์นี้เปลี่ยนมาใช้บัญชี Gmail ส่วนตัว (credential รูปแบบ `authorized_user`) แทน service
+account เดิม เพราะบัญชี Gmail ส่วนตัวใช้ Shared Drive ไม่ได้ โค้ดฝั่งนี้อัปเดตให้รองรับทั้งสองรูปแบบแล้ว
+(เลือก auth อัตโนมัติจาก field `type`) และเอา `supportsAllDrives` ออกจาก upload call เพราะไม่จำเป็นอีกต่อไป
 
-โค้ดฝั่งนี้รองรับ Shared Drive ไว้แล้ว (`supportsAllDrives`, `includeItemsFromAllDrives`, `corpora: 'allDrives'`)
-เหลือเพียงตั้งค่าฝั่ง Google Workspace/Cloud Console ตามข้อใดข้อหนึ่งข้างต้น ก็จะบันทึก snapshot ได้จริง
-โดยไม่ต้องแก้โค้ดเพิ่ม
+ครั้งล่าสุดที่รัน `npm run demo:storage` ใน session นี้ ตัวแปร `GOOGLE_DRIVE_CREDENTIALS` ที่ session อ่านได้
+**ยังเป็น credential แบบ `service_account` เดิม** (ยังไม่ใช่ `authorized_user` ใหม่ — environment variable
+ของ session จะถูกกำหนดตอนเริ่ม session เท่านั้น การอัปเดตค่าที่อื่นจึงยังไม่ถูกอ่านเข้ามาจนกว่าจะเปิด session
+ใหม่) ผลคือได้ error `"Project #5505543463 has been deleted"` จาก Google (โปรเจกต์ GCP ของ service account
+เดิมถูกลบไปแล้ว) — ยืนยันได้ว่า **ไม่ใช่บั๊กของโค้ด** เพราะ error เปลี่ยนจาก "ไม่มี storage quota" (ของเดิม)
+เป็น error เกี่ยวกับโปรเจกต์ถูกลบ ซึ่งเป็นเรื่องของ credential ที่ยังไม่อัปเดต ไม่ใช่ logic ในโค้ด
+
+**ต้องทำต่อ:** เปิด session ใหม่ (ให้ environment variable `GOOGLE_DRIVE_CREDENTIALS` ที่เป็น `authorized_user`
+ถูกอ่านเข้ามาจริง) แล้วรัน `npm run demo:storage` อีกครั้งเพื่อยืนยันว่าบันทึกไฟล์ขึ้น Drive ส่วนตัวได้จริง
 
 ## เฟสถัดไป
 

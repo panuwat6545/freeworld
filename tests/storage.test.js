@@ -7,7 +7,7 @@ import { Character } from '../src/characters/character.js';
 import { Structure } from '../src/building/structure.js';
 import { buildSnapshot, formatSnapshotFilename, SNAPSHOT_FOLDER_PATH } from '../src/storage/snapshot.js';
 import { saveSnapshot } from '../src/storage/save-snapshot.js';
-import { ensureFolderPath, resetDriveClientCache } from '../src/storage/drive-client.js';
+import { ensureFolderPath, resetDriveClientCache, getDriveClient } from '../src/storage/drive-client.js';
 import { SnapshotScheduler } from '../src/storage/snapshot-scheduler.js';
 
 test('formatSnapshotFilename ตั้งชื่อไฟล์ตามรูปแบบ snapshot_YYYY-MM-DD_HHmm.json', () => {
@@ -117,6 +117,73 @@ test('saveSnapshot จัดการ error เมื่อไม่มี crede
     if (originalEnv !== undefined) process.env.GOOGLE_DRIVE_CREDENTIALS = originalEnv;
     resetDriveClientCache();
   }
+});
+
+// ตั้ง GOOGLE_DRIVE_CREDENTIALS ชั่วคราวให้ fn ใช้ แล้วคืนค่าเดิมกลับให้เสมอ (แม้ fn จะ throw/reject)
+// เป็น async เสมอและ await fn() ก่อนคืนค่า env เดิม เพื่อไม่ให้ env ถูกคืนก่อน fn ทำงานเสร็จจริง
+async function withEnvCredential(credentialObjectOrRaw, fn) {
+  const originalEnv = process.env.GOOGLE_DRIVE_CREDENTIALS;
+  process.env.GOOGLE_DRIVE_CREDENTIALS =
+    typeof credentialObjectOrRaw === 'string' ? credentialObjectOrRaw : JSON.stringify(credentialObjectOrRaw);
+  resetDriveClientCache();
+  try {
+    return await fn();
+  } finally {
+    if (originalEnv !== undefined) process.env.GOOGLE_DRIVE_CREDENTIALS = originalEnv;
+    else delete process.env.GOOGLE_DRIVE_CREDENTIALS;
+    resetDriveClientCache();
+  }
+}
+
+test('getDriveClient สร้าง client ได้เมื่อ credential เป็น service_account', async () => {
+  await withEnvCredential(
+    {
+      type: 'service_account',
+      project_id: 'p',
+      private_key: '-----BEGIN PRIVATE KEY-----\nfake\n-----END PRIVATE KEY-----\n',
+      client_email: 'bot@p.iam.gserviceaccount.com',
+    },
+    () => {
+      const drive = getDriveClient();
+      assert.ok(drive.files, 'ควรได้ Drive client ที่มี files API');
+    },
+  );
+});
+
+test('getDriveClient สร้าง client ได้เมื่อ credential เป็น authorized_user (OAuth2 + refresh_token)', async () => {
+  await withEnvCredential(
+    {
+      type: 'authorized_user',
+      client_id: 'fake-client-id',
+      client_secret: 'fake-client-secret',
+      refresh_token: 'fake-refresh-token',
+    },
+    () => {
+      const drive = getDriveClient();
+      assert.ok(drive.files, 'ควรได้ Drive client ที่มี files API');
+    },
+  );
+});
+
+test('getDriveClient โยน error ที่เข้าใจง่ายเมื่อ authorized_user ขาด field ที่จำเป็น', async () => {
+  await withEnvCredential({ type: 'authorized_user', client_id: 'only-this-field' }, () => {
+    assert.throws(() => getDriveClient(), /authorized_user.*client_id.*client_secret.*refresh_token/s);
+  });
+});
+
+test('getDriveClient โยน error ที่เข้าใจง่ายเมื่อ field "type" ไม่รู้จัก', async () => {
+  await withEnvCredential({ type: 'something_unexpected' }, () => {
+    assert.throws(() => getDriveClient(), /ไม่รู้จัก/);
+  });
+});
+
+test('saveSnapshot จัดการ error โดยไม่ throw เมื่อ credential เป็น authorized_user แต่ข้อมูลไม่ครบ', async () => {
+  await withEnvCredential({ type: 'authorized_user', client_id: 'x' }, async () => {
+    const world = new World({ width: 3, height: 3, seed: 1, density: 0 });
+    const result = await saveSnapshot(world, [], 1, {});
+    assert.equal(result.success, false);
+    assert.match(result.error, /authorized_user/);
+  });
 });
 
 test('ensureFolderPath สร้างโฟลเดอร์ตามลำดับ path เมื่อยังไม่มีอยู่จริง', async () => {
