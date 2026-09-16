@@ -1,4 +1,5 @@
 import { NEEDS_CONFIG, NEED_PRIORITY, NEED_MIN, NEED_MAX } from './needs-config.js';
+import { createWallet } from '../economy/wallet.js';
 
 let nextCharacterId = 1;
 
@@ -19,6 +20,9 @@ export class Character {
     };
     this.inventory = { wood: 0 };
     this.currentBehavior = null;
+    // เฟส 6 (สกุลเงิน xcoin): ทุกตัวละครมี wallet เริ่มต้นด้วย STARTING_BALANCE เท่ากันหมด รวมถึงตัวละคร
+    // ที่เกิดใหม่จากเฟส 4 ด้วย (ไม่แยกกรณีให้ซับซ้อนเกินจำเป็น — ดูเหตุผลใน README)
+    this.wallet = createWallet();
     // เฟส 4 (ระบบสังคม/ถิ่นฐาน): ถิ่นฐานที่ตัวละครนี้ถือว่าเป็น "บ้าน" กับ tick ที่เริ่มเป็นแบบนั้น
     // อัปเดตอัตโนมัติโดย src/society/home-tracker.js ไม่ได้ตั้งค่าตรงนี้ตอนสร้างตัวละคร
     this.homeSettlementId = null;
