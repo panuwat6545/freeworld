@@ -55,8 +55,13 @@ function gatherWood(character, world) {
 }
 
 // shelter ต่ำ (และเก็บทรัพยากรครบสูตรที่พักแล้ว) -> สร้างที่พักลงบน grid ที่ตำแหน่งปัจจุบัน แล้วหักทรัพยากรออกจาก inventory
+// สร้างสำเร็จแล้วต้องฟื้นค่า need shelter กลับด้วย (เหมือน seekFood/rest/socialize ฟื้น need ของตัวเอง)
+// ไม่งั้น shelter จะค้างต่ำสุดตลอดกาลและกลายเป็น need เร่งด่วนที่สุดทุก tick จนวนลูปสร้างไม่หยุด
 function buildShelter(character, world) {
-  build(character, world, BLUEPRINTS.shelter.id);
+  const structure = build(character, world, BLUEPRINTS.shelter.id);
+  if (structure) {
+    character.needs.shelter = clampNeedValue(character.needs.shelter + NEEDS_CONFIG.SHELTER_RESTORE_AMOUNT);
+  }
 }
 
 // social ต่ำ -> เดินเข้าใกล้ตัวละครอื่นที่ใกล้ที่สุด แล้วปฏิสัมพันธ์เมื่ออยู่ติดกัน

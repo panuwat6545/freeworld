@@ -112,6 +112,42 @@ test('ตัวละครสร้างที่พักอัตโนม�
   assert.equal(character.inventory.wood, 0); // เก็บได้พอดี 10 แล้วหักหมดตอนสร้าง
 });
 
+test('buildShelter ฟื้นค่า need shelter กลับขึ้นมาหลังสร้างสำเร็จ (กันบั๊กค้างที่ 0 ตลอดกาล)', () => {
+  const world = makeControlledWorld(4, 4);
+  world.grid.getCell(0, 0).resourceNode = new ResourceNode(RESOURCE_TYPES.WOOD, {
+    amount: 100,
+    maxAmount: 100,
+    regenRate: 1,
+  });
+  const character = new Character({ x: 0, y: 0, needs: { hunger: 90, energy: 90, shelter: 5, social: 90 } });
+
+  let built = false;
+  for (let i = 0; i < 5 && !built; i++) {
+    const behavior = updateCharacter(character, world, [character], 1);
+    if (behavior === BEHAVIORS.BUILD_SHELTER) built = true;
+  }
+
+  assert.ok(built, 'ควรสร้างที่พักสำเร็จก่อนถึง assertion ถัดไป');
+  assert.ok(
+    character.needs.shelter > 5,
+    'shelter need ต้องเพิ่มขึ้นจากค่าตั้งต้นหลังสร้างที่พักสำเร็จ ไม่ใช่ค้างที่เดิม',
+  );
+
+  // ถ้า shelter ยังเป็น need เร่งด่วนที่สุดทันทีหลังสร้าง (ทั้งที่ hunger/energy/social ต่ำกว่ามาก)
+  // แปลว่าบั๊กเดิม (ฟื้น shelter ไม่สำเร็จ) กลับมาอีก
+  const behaviorAfterBuild = updateCharacter(character, world, [character], 1);
+  assert.notEqual(
+    behaviorAfterBuild,
+    BEHAVIORS.GATHER_WOOD,
+    'หลังสร้างที่พักสำเร็จ ไม่ควรกลับไปเก็บไม้เพื่อสร้างต่อทันที เพราะ shelter ควรฟื้นแล้ว',
+  );
+  assert.notEqual(
+    behaviorAfterBuild,
+    BEHAVIORS.BUILD_SHELTER,
+    'หลังสร้างที่พักสำเร็จ ไม่ควรวนกลับมาสร้างอีกทันที เพราะ shelter ควรฟื้นแล้ว',
+  );
+});
+
 test('rest ฟื้นพลังงานเร็วขึ้นเมื่ออยู่ใกล้ที่พัก เทียบกับพักเฉยๆ', () => {
   const worldNoShelter = makeControlledWorld(10, 10);
   const characterAlone = new Character({ x: 5, y: 5, needs: { hunger: 90, energy: 10, shelter: 90, social: 90 } });
