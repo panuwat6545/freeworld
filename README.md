@@ -194,15 +194,24 @@ npm test              # รวม unit test ของเฟส 1, 2, 3, 5 (ใ�
 account เดิม เพราะบัญชี Gmail ส่วนตัวใช้ Shared Drive ไม่ได้ โค้ดฝั่งนี้อัปเดตให้รองรับทั้งสองรูปแบบแล้ว
 (เลือก auth อัตโนมัติจาก field `type`) และเอา `supportsAllDrives` ออกจาก upload call เพราะไม่จำเป็นอีกต่อไป
 
-ครั้งล่าสุดที่รัน `npm run demo:storage` ใน session นี้ ตัวแปร `GOOGLE_DRIVE_CREDENTIALS` ที่ session อ่านได้
-**ยังเป็น credential แบบ `service_account` เดิม** (ยังไม่ใช่ `authorized_user` ใหม่ — environment variable
-ของ session จะถูกกำหนดตอนเริ่ม session เท่านั้น การอัปเดตค่าที่อื่นจึงยังไม่ถูกอ่านเข้ามาจนกว่าจะเปิด session
-ใหม่) ผลคือได้ error `"Project #5505543463 has been deleted"` จาก Google (โปรเจกต์ GCP ของ service account
-เดิมถูกลบไปแล้ว) — ยืนยันได้ว่า **ไม่ใช่บั๊กของโค้ด** เพราะ error เปลี่ยนจาก "ไม่มี storage quota" (ของเดิม)
-เป็น error เกี่ยวกับโปรเจกต์ถูกลบ ซึ่งเป็นเรื่องของ credential ที่ยังไม่อัปเดต ไม่ใช่ logic ในโค้ด
+**อัปเดตล่าสุด (ยืนยันสำเร็จแล้ว):** หลังเปิด session ใหม่ที่อ่าน `GOOGLE_DRIVE_CREDENTIALS` แบบ `authorized_user`
+ได้จริง และเปิดใช้งาน Google Drive API ในโปรเจกต์ GCP ของ OAuth client แล้ว การรัน `npm run demo:storage`
+อัปโหลดไฟล์ snapshot ขึ้น Google Drive บัญชี Gmail ส่วนตัวได้สำเร็จครบทั้ง 3 ปีในเกมจำลอง โดยไม่มี error ใดๆ
+ตัวอย่าง log:
 
-**ต้องทำต่อ:** เปิด session ใหม่ (ให้ environment variable `GOOGLE_DRIVE_CREDENTIALS` ที่เป็น `authorized_user`
-ถูกอ่านเข้ามาจริง) แล้วรัน `npm run demo:storage` อีกครั้งเพื่อยืนยันว่าบันทึกไฟล์ขึ้น Drive ส่วนตัวได้จริง
+```
+[storage] บันทึก snapshot สำเร็จ: snapshot_2026-09-16_0504.json (fileId=1H6pE76aJFXuE2rnOGd-6ztMjEludEKOv)
+>>> ครบ 1 ปีเกม (tick 20) บันทึกไฟล์ "snapshot_2026-09-16_0504.json" สำเร็จ
+[storage] บันทึก snapshot สำเร็จ: snapshot_2026-09-16_0504.json (fileId=1OkqPRSJyH8cixAlpHcmaHdndKazf8ZC_)
+>>> ครบ 1 ปีเกม (tick 40) บันทึกไฟล์ "snapshot_2026-09-16_0504.json" สำเร็จ
+[storage] บันทึก snapshot สำเร็จ: snapshot_2026-09-16_0504.json (fileId=15k7xhjUnz7XfGO8Mt-DbCTDwcxquQ9pJ)
+>>> ครบ 1 ปีเกม (tick 60) บันทึกไฟล์ "snapshot_2026-09-16_0504.json" สำเร็จ
+จบการจำลอง
+```
+
+ตรวจสอบข้าม (cross-check) ผ่าน Google Drive API โดยตรงด้วย `fileId` ล่าสุด (`15k7xhjUnz7XfGO8Mt-DbCTDwcxquQ9pJ`)
+พบว่าไฟล์มีอยู่จริงบน Drive ของบัญชี `panuwat16singha@gmail.com` ในโฟลเดอร์ `/freeworld-ecosystem/snapshots`
+ชื่อไฟล์และขนาดไฟล์ตรงกับ log — ยืนยันว่าเฟส 5 ทำงานได้ถูกต้องกับ Google Drive จริง ไม่ใช่แค่ log ที่ไม่มีไฟล์จริงรองรับ
 
 ## เฟสถัดไป
 
