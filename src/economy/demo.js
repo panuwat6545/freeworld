@@ -25,10 +25,7 @@ const villageB = [
 const characters = [...villageA, ...villageB];
 
 console.log(`สร้างโลกขนาด ${world.width}x${world.height} และตัวละคร ${characters.length} ตัว (2 กลุ่มตำแหน่งห่างกัน)`);
-console.log(
-  `xcoin เริ่มต้นของทุกตัวละคร: ${characters[0].wallet.balance} | ` +
-    `จำลอง "รายได้พื้นฐาน" (placeholder รอเฟส 9) แบบสุ่มทุกปี`,
-);
+console.log(`xcoin เริ่มต้นของทุกตัวละคร: ${characters[0].wallet.balance}`);
 
 const society = new SocietySystem();
 const economy = new EconomySystem();
@@ -42,13 +39,12 @@ for (let t = 1; t <= TOTAL_TICKS; t++) {
   world.update(1);
   for (const character of characters) updateCharacter(character, world, characters, 1);
   const settlements = society.update(world, characters, t);
-  const { inflationEvent, incomeEvent } = economy.update(world, characters);
+  const { inflationEvent } = economy.update(world);
 
   if (inflationEvent) {
     console.log(
       `=== ปีที่ ${inflationEvent.year} === อัตราเงินเฟ้อปีนี้: ${(inflationEvent.rate * 100).toFixed(2)}% ` +
-        `| ดัชนีราคาสะสม: ${inflationEvent.cumulativeIndex.toFixed(3)} ` +
-        `| รายได้พื้นฐานจ่ายรวม: ${incomeEvent.totalPaid.toFixed(1)} xcoin (${incomeEvent.characterCount} ตัวละคร)`,
+        `| ดัชนีราคาสะสม: ${inflationEvent.cumulativeIndex.toFixed(3)}`,
     );
 
     if (settlements.length === 0) {

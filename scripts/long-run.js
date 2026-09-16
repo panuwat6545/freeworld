@@ -6,8 +6,9 @@
 // ยอด xcoin เฉลี่ยต่อถิ่นฐาน กับอัตราเงินเฟ้อ/ดัชนีราคาสะสม, ระบบแลกเปลี่ยน (เฟส 7): จำนวนธุรกรรมรวม
 // แยกประเภท xcoin/barter สะสม, และระบบกฎหมาย/การปกครอง (เฟส 8): ครึ่งแรก (ปีที่ 0-15) ไม่มีกฎหมายเลย
 // ครึ่งหลัง (ปีที่ 15-30) ให้ผู้นำทุกถิ่นฐาน ณ ตอนนั้นเปิดกฎหมายทั้ง 2 ข้อ เพื่อเทียบผลกระทบก่อน-หลัง
-// (คลังภาษี/จำนวนครั้งที่ถูก block-penalize การเก็บทรัพยากร) แล้วบันทึก snapshot สุดท้ายขึ้น Google Drive
-// เหมือน demo:storage
+// (คลังภาษี/จำนวนครั้งที่ถูก block-penalize การเก็บทรัพยากร) และระบบอาชีพที่เกิดเอง (เฟส 9): การกระจาย
+// อาชีพของตัวละครทั้งหมด (แทนที่ basic-income เดิมของเฟส 6 ทั้งหมด) แล้วบันทึก snapshot สุดท้ายขึ้น
+// Google Drive เหมือน demo:storage
 import { World } from '../src/world/world.js';
 import { Character } from '../src/characters/character.js';
 import { updateCharacter } from '../src/characters/utility-ai.js';
@@ -17,11 +18,13 @@ import { DEFAULT_TICKS_PER_YEAR } from '../src/storage/snapshot-scheduler.js';
 import { SocietySystem } from '../src/society/society-system.js';
 import { EconomySystem } from '../src/economy/economy-system.js';
 import { InflationTracker } from '../src/economy/inflation.js';
-import { BasicIncomeGenerator } from '../src/economy/basic-income.js';
 import { getSettlementAverageBalance } from '../src/economy/settlement-economy.js';
 import { TradeSystem } from '../src/trade/trade-system.js';
 import { GovernanceSystem } from '../src/governance/governance-system.js';
 import { createRng } from '../src/world/random.js';
+import { PROFESSION_REGISTRY } from '../src/professions/profession.js';
+import { ProfessionAssignmentTracker } from '../src/professions/profession-assignment.js';
+import { IncomeSupportGenerator, ProfessionIncomeTracker } from '../src/professions/income-generation.js';
 
 const TICKS_PER_YEAR = DEFAULT_TICKS_PER_YEAR; // 1 ปีเกมจริง = 365 tick (ไม่ย่อเหมือน demo:storage)
 const YEARS_TO_SIMULATE = 30;
@@ -139,6 +142,16 @@ function printReport(year, settlements) {
       if (treasury > 0) console.log(`  คลังถิ่นฐาน #${s.id} (จากภาษีการค้า): ${treasury.toFixed(1)} xcoin`);
     }
   }
+
+  const unemployedCount = characters.filter((c) => c.profession === null).length;
+  const distributionParts = PROFESSION_REGISTRY.map((p) => {
+    const count = characters.filter((c) => c.profession === p.id).length;
+    const income = professionIncome.getTotalIncome(p.id);
+    return `${p.name}=${count}คน(รายได้สะสม ${income.toFixed(1)})`;
+  });
+  console.log(
+    `อาชีพ: ${distributionParts.join(', ')}, ยังไม่มีอาชีพ=${unemployedCount}คน`,
+  );
 }
 
 // คำนวณเขตสี่เหลี่ยมล้อมรอบที่พักทั้งหมดของถิ่นฐาน (บวก margin) ใช้เป็นพารามิเตอร์ territorial_access
@@ -177,11 +190,16 @@ const society = new SocietySystem();
 // คงที่อยู่แล้ว) จึงฉีด RNG ที่มี seed คงที่ (createRng เดิมจาก src/world/random.js) เข้าไปแทน
 const economy = new EconomySystem({
   inflation: new InflationTracker({ randomFn: createRng(20260916) }),
-  basicIncome: new BasicIncomeGenerator({ randomFn: createRng(19700101) }),
 });
 const trade = new TradeSystem();
 const governance = new GovernanceSystem({ world });
 let governanceEnabled = false;
+// เฟส 9 (อาชีพที่เกิดเอง): แทนที่ BasicIncomeGenerator เดิมทั้งหมด — ตัวละครไม่มีอาชีพยังได้เงินเดือนขั้นต่ำ
+// เต็มจำนวนเหมือนเดิม ส่วนตัวละครมีอาชีพแล้วได้แค่เศษเสี้ยว (EMPLOYED_STIPEND_FRACTION) เพื่อความเสถียร
+// ของระบบ (ดูเหตุผล/การ tune เต็มใน README) ใช้ seed คงที่แยกจาก inflation เดิมเพื่อคงหลักการกำหนดเอง
+const incomeSupport = new IncomeSupportGenerator({ randomFn: createRng(19700101) });
+const professionAssignment = new ProfessionAssignmentTracker();
+const professionIncome = new ProfessionIncomeTracker();
 const GOVERNANCE_START_YEAR = 15; // ครึ่งแรก (0-15 ปี) ไม่มีกฎหมายเลย ครึ่งหลัง (15-30 ปี) เปิดกฎหมายทั้ง 2 ข้อ
 
 const TOTAL_TICKS = TICKS_PER_YEAR * YEARS_TO_SIMULATE;
@@ -206,15 +224,19 @@ for (let t = 1; t <= TOTAL_TICKS; t++) {
     governance.setCurrentHarvester(character);
     updateCharacter(character, world, characters, 1);
     updateStuckTracking(character);
+    professionAssignment.observeBehavior(character, world, t);
   }
   governance.setCurrentHarvester(null);
 
   // เรียกหลัง update ตัวละครทุกตัวในรอบนี้เสร็จแล้ว (อาจ push ตัวละครใหม่เข้า characters ถ้าเกิดลูก
   // ซึ่งจะเข้าร่วมลูปรอบ tick ถัดไปโดยอัตโนมัติ)
   settlements = society.update(world, characters, t);
-  economy.update(world, characters);
+  economy.update(world);
+  incomeSupport.checkAndPay(world, characters);
   const tradeEvents = trade.update(world, characters, economy.inflation.cumulativeIndex);
   governance.applyTradeLaws(tradeEvents, characters, settlements);
+  professionAssignment.observeTradeEvents(tradeEvents, characters, t);
+  professionIncome.observeTradeEvents(tradeEvents, characters);
 
   if (t % (TICKS_PER_YEAR * YEARS_PER_REPORT) === 0) {
     printReport(t / TICKS_PER_YEAR, settlements);

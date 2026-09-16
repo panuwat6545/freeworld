@@ -7,9 +7,4 @@ export const ECONOMY_CONFIG = Object.freeze({
   // ช่วงอัตราเงินเฟ้อที่สุ่มใหม่ทุกปีเกม (2-10% ตามสเปก)
   INFLATION_MIN_RATE: 0.02,
   INFLATION_MAX_RATE: 0.1,
-
-  // PLACEHOLDER: ช่วง "รายได้พื้นฐาน" ที่จ่ายให้ทุกตัวละครแบบสุ่มทุกปี ชั่วคราวจนกว่าเฟส 9 (อาชีพที่เกิดเอง)
-  // จะมาแทนที่ด้วยรายได้จากการทำงานจริง (ดู basic-income.js)
-  BASIC_INCOME_MIN: 5,
-  BASIC_INCOME_MAX: 20,
 });

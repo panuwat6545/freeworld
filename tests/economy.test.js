@@ -6,7 +6,6 @@ import { Settlement } from '../src/society/settlement.js';
 import { ECONOMY_CONFIG } from '../src/economy/economy-config.js';
 import { createWallet, deposit, withdraw } from '../src/economy/wallet.js';
 import { InflationTracker } from '../src/economy/inflation.js';
-import { BasicIncomeGenerator } from '../src/economy/basic-income.js';
 import { getSettlementTotalBalance, getSettlementAverageBalance } from '../src/economy/settlement-economy.js';
 import { EconomySystem } from '../src/economy/economy-system.js';
 
@@ -98,32 +97,6 @@ test('InflationTracker สุ่มด้วย Math.random จริงหล�
   }
 });
 
-test('BasicIncomeGenerator จ่ายรายได้พื้นฐานให้ทุกตัวละครเมื่อครบปีใหม่ อยู่ในช่วงที่กำหนด', () => {
-  const world = new World({ width: 5, height: 5, seed: 1, density: 0 });
-  const characters = [new Character({ needs: {} }), new Character({ needs: {} })];
-  const startingBalances = characters.map((c) => c.wallet.balance);
-
-  const generator = new BasicIncomeGenerator({ ticksPerYear: 10, randomFn: () => 0.5 });
-  world.update(10);
-  const result = generator.checkAndPay(world, characters);
-
-  assert.equal(result.characterCount, 2);
-  const expectedAmount =
-    ECONOMY_CONFIG.BASIC_INCOME_MIN + 0.5 * (ECONOMY_CONFIG.BASIC_INCOME_MAX - ECONOMY_CONFIG.BASIC_INCOME_MIN);
-  characters.forEach((c, i) => {
-    assert.ok(Math.abs(c.wallet.balance - (startingBalances[i] + expectedAmount)) < 1e-9);
-  });
-});
-
-test('BasicIncomeGenerator ไม่จ่ายซ้ำถ้ายังไม่ครบปีใหม่', () => {
-  const world = new World({ width: 5, height: 5, seed: 1, density: 0 });
-  const characters = [new Character({ needs: {} })];
-  const generator = new BasicIncomeGenerator({ ticksPerYear: 100 });
-
-  world.update(50);
-  assert.equal(generator.checkAndPay(world, characters), null);
-});
-
 test('getSettlementTotalBalance / getSettlementAverageBalance รวม/เฉลี่ยยอด xcoin ของสมาชิกถิ่นฐานถูกต้อง', () => {
   const characterA = new Character({ needs: {} });
   const characterB = new Character({ needs: {} });
@@ -145,21 +118,17 @@ test('getSettlementAverageBalance คืนค่า 0 เมื่อถิ่�
   assert.equal(getSettlementAverageBalance(settlement, []), 0);
 });
 
-test('EconomySystem.update คืนค่า inflationEvent/incomeEvent พร้อมกันเมื่อครบปีใหม่ และ null ทั้งคู่ถ้ายังไม่ครบ', () => {
+test('EconomySystem.update คืนค่า inflationEvent เมื่อครบปีใหม่ และ null ถ้ายังไม่ครบ', () => {
   const world = new World({ width: 5, height: 5, seed: 1, density: 0 });
-  const characters = [new Character({ needs: {} })];
   const economy = new EconomySystem({
     inflation: new InflationTracker({ ticksPerYear: 10 }),
-    basicIncome: new BasicIncomeGenerator({ ticksPerYear: 10 }),
   });
 
   world.update(5);
-  const beforeYear = economy.update(world, characters);
+  const beforeYear = economy.update(world);
   assert.equal(beforeYear.inflationEvent, null);
-  assert.equal(beforeYear.incomeEvent, null);
 
   world.update(5);
-  const afterYear = economy.update(world, characters);
+  const afterYear = economy.update(world);
   assert.ok(afterYear.inflationEvent !== null);
-  assert.ok(afterYear.incomeEvent !== null);
 });

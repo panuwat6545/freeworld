@@ -32,6 +32,10 @@ export class Character {
     // ที่เกิด เพื่อให้ reproduction.js เช็คอายุขั้นต่ำก่อนอนุญาตให้มีลูกได้ (กันลูกที่เพิ่งเกิดจับคู่กับ
     // พ่อ/แม่ตัวเองทันทีเพราะ needs เต็ม 100 อยู่ติดกัน จนเกิดลูกวนไม่หยุดทั้งที่มี cooldown ต่อคู่แล้ว)
     this.bornAtTick = 0;
+    // เฟส 9 (อาชีพที่เกิดเอง): อาชีพปัจจุบัน (null = ยังไม่มีอาชีพชัดเจน) กับ tick ที่เริ่มเป็นอาชีพนี้
+    // อัปเดตอัตโนมัติโดย src/professions/profession-assignment.js ไม่ได้ตั้งค่าตรงนี้ตอนสร้างตัวละคร
+    this.profession = null;
+    this.professionSinceTick = null;
   }
 
   // ลด needs ทุกตัวตามอัตรา decay คูณจำนวน tick ที่ผ่านไป ไม่ต่ำกว่า 0
