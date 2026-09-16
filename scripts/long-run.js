@@ -3,8 +3,11 @@
 // ของ needs เฉลี่ย จำนวนที่พักที่สร้างสำเร็จสะสม และจับสัญญาณตัวละครที่ AI น่าจะมีปัญหา
 // (need ตัวใดตัวหนึ่งค้างต่ำกว่า 20 ติดต่อกันนานเกิน 3 ปีเกม) รวมถึงระบบสังคม/ถิ่นฐาน (เฟส 4): จำนวน
 // ถิ่นฐาน, ประชากรรวม (นับตัวละครที่เกิดใหม่ด้วย), ผู้นำแต่ละถิ่นฐาน, ระบบเศรษฐกิจ xcoin (เฟส 6):
-// ยอด xcoin เฉลี่ยต่อถิ่นฐาน กับอัตราเงินเฟ้อ/ดัชนีราคาสะสม, และระบบแลกเปลี่ยน (เฟส 7): จำนวนธุรกรรมรวม
-// แยกประเภท xcoin/barter สะสม แล้วบันทึก snapshot สุดท้ายขึ้น Google Drive เหมือน demo:storage
+// ยอด xcoin เฉลี่ยต่อถิ่นฐาน กับอัตราเงินเฟ้อ/ดัชนีราคาสะสม, ระบบแลกเปลี่ยน (เฟส 7): จำนวนธุรกรรมรวม
+// แยกประเภท xcoin/barter สะสม, และระบบกฎหมาย/การปกครอง (เฟส 8): ครึ่งแรก (ปีที่ 0-15) ไม่มีกฎหมายเลย
+// ครึ่งหลัง (ปีที่ 15-30) ให้ผู้นำทุกถิ่นฐาน ณ ตอนนั้นเปิดกฎหมายทั้ง 2 ข้อ เพื่อเทียบผลกระทบก่อน-หลัง
+// (คลังภาษี/จำนวนครั้งที่ถูก block-penalize การเก็บทรัพยากร) แล้วบันทึก snapshot สุดท้ายขึ้น Google Drive
+// เหมือน demo:storage
 import { World } from '../src/world/world.js';
 import { Character } from '../src/characters/character.js';
 import { updateCharacter } from '../src/characters/utility-ai.js';
@@ -17,6 +20,7 @@ import { InflationTracker } from '../src/economy/inflation.js';
 import { BasicIncomeGenerator } from '../src/economy/basic-income.js';
 import { getSettlementAverageBalance } from '../src/economy/settlement-economy.js';
 import { TradeSystem } from '../src/trade/trade-system.js';
+import { GovernanceSystem } from '../src/governance/governance-system.js';
 import { createRng } from '../src/world/random.js';
 
 const TICKS_PER_YEAR = DEFAULT_TICKS_PER_YEAR; // 1 ปีเกมจริง = 365 tick (ไม่ย่อเหมือน demo:storage)
@@ -124,6 +128,47 @@ function printReport(year, settlements) {
   console.log(
     `ธุรกรรมสะสม: xcoin ${trade.totalXcoinTransactions} ครั้ง, barter ${trade.totalBarterTransactions} ครั้ง`,
   );
+
+  console.log(
+    `กฎหมาย: ${governanceEnabled ? 'เปิดใช้งานแล้ว (ทุกถิ่นฐาน ณ ตอนเปิด)' : 'ยังไม่เปิด'} | ` +
+      `เก็บทรัพยากรถูก block สะสม ${governance.totalBlockedGathers} ครั้ง, penalty สะสม ${governance.totalPenalizedGathers} ครั้ง`,
+  );
+  if (settlements.length > 0) {
+    for (const s of settlements) {
+      const treasury = governance.getTreasuryBalance(s.id);
+      if (treasury > 0) console.log(`  คลังถิ่นฐาน #${s.id} (จากภาษีการค้า): ${treasury.toFixed(1)} xcoin`);
+    }
+  }
+}
+
+// คำนวณเขตสี่เหลี่ยมล้อมรอบที่พักทั้งหมดของถิ่นฐาน (บวก margin) ใช้เป็นพารามิเตอร์ territorial_access
+// — เป็นการตัดสินใจออกแบบง่ายๆ ให้เครื่องมือสำรวจนี้: "เขตของถิ่นฐาน" คือบริเวณรอบๆ ที่พักของตัวเอง
+function computeSettlementTerritory(settlement, margin = 3) {
+  const positions = world.structures.filter((s) => settlement.structureIds.includes(s.id)).map((s) => s.position);
+  if (positions.length === 0) return { minX: 0, minY: 0, maxX: 0, maxY: 0 };
+  const xs = positions.map((p) => p.x);
+  const ys = positions.map((p) => p.y);
+  return {
+    minX: Math.max(0, Math.min(...xs) - margin),
+    minY: Math.max(0, Math.min(...ys) - margin),
+    maxX: Math.min(world.width - 1, Math.max(...xs) + margin),
+    maxY: Math.min(world.height - 1, Math.max(...ys) + margin),
+  };
+}
+
+// เรียกครั้งเดียวตอนเปลี่ยนเข้าสู่ครึ่งหลัง (ปีที่ 15): ให้ผู้นำทุกถิ่นฐาน ณ ตอนนั้นเปิดกฎหมายทั้ง 2 ข้อ
+// ถิ่นฐานที่เพิ่งก่อตัวทีหลัง (หลังปีที่ 15) จะไม่ได้กฎหมายอัตโนมัติ (นอกขอบเขตของเครื่องมือสำรวจนี้)
+function enableGovernanceForAllSettlements(settlements) {
+  for (const settlement of settlements) {
+    if (settlement.leaderId === null) continue;
+    governance.lawsetRegistry.enableLaw(settlement, settlement.leaderId, 'trade_tax', { rate: 0.15 });
+    governance.lawsetRegistry.enableLaw(
+      settlement,
+      settlement.leaderId,
+      'territorial_access',
+      computeSettlementTerritory(settlement),
+    );
+  }
 }
 
 const society = new SocietySystem();
@@ -135,6 +180,9 @@ const economy = new EconomySystem({
   basicIncome: new BasicIncomeGenerator({ randomFn: createRng(19700101) }),
 });
 const trade = new TradeSystem();
+const governance = new GovernanceSystem({ world });
+let governanceEnabled = false;
+const GOVERNANCE_START_YEAR = 15; // ครึ่งแรก (0-15 ปี) ไม่มีกฎหมายเลย ครึ่งหลัง (15-30 ปี) เปิดกฎหมายทั้ง 2 ข้อ
 
 const TOTAL_TICKS = TICKS_PER_YEAR * YEARS_TO_SIMULATE;
 console.log(
@@ -142,17 +190,31 @@ console.log(
     `กับตัวละคร ${characters.length} ตัว (แบบเงียบ สรุปผลทุก ${YEARS_PER_REPORT} ปี)`,
 );
 
+let settlements = []; // ผลจาก tick ก่อนหน้า ใช้บอก governance ว่าถิ่นฐานไหนบ้าง (มี lag 1 tick เหมือน
+// ที่ home-tracker.js ของเฟส 4 ใช้ structureToSettlementId ที่อาจ stale ได้เล็กน้อยเช่นกัน)
+
 for (let t = 1; t <= TOTAL_TICKS; t++) {
   world.update(1);
+
+  if (!governanceEnabled && t === TICKS_PER_YEAR * GOVERNANCE_START_YEAR) {
+    enableGovernanceForAllSettlements(settlements);
+    governanceEnabled = true;
+  }
+
+  governance.setSettlements(settlements);
   for (const character of characters) {
+    governance.setCurrentHarvester(character);
     updateCharacter(character, world, characters, 1);
     updateStuckTracking(character);
   }
+  governance.setCurrentHarvester(null);
+
   // เรียกหลัง update ตัวละครทุกตัวในรอบนี้เสร็จแล้ว (อาจ push ตัวละครใหม่เข้า characters ถ้าเกิดลูก
   // ซึ่งจะเข้าร่วมลูปรอบ tick ถัดไปโดยอัตโนมัติ)
-  const settlements = society.update(world, characters, t);
+  settlements = society.update(world, characters, t);
   economy.update(world, characters);
-  trade.update(world, characters, economy.inflation.cumulativeIndex);
+  const tradeEvents = trade.update(world, characters, economy.inflation.cumulativeIndex);
+  governance.applyTradeLaws(tradeEvents, characters, settlements);
 
   if (t % (TICKS_PER_YEAR * YEARS_PER_REPORT) === 0) {
     printReport(t / TICKS_PER_YEAR, settlements);

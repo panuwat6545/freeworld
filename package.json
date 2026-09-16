@@ -12,6 +12,7 @@
     "demo:society": "node src/society/demo.js",
     "demo:economy": "node src/economy/demo.js",
     "demo:trade": "node src/trade/demo.js",
+    "demo:governance": "node src/governance/demo.js",
     "long-run": "node scripts/long-run.js",
     "test": "node --test"
   },
