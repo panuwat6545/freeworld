@@ -7,8 +7,9 @@
 // แยกประเภท xcoin/barter สะสม, และระบบกฎหมาย/การปกครอง (เฟส 8): ครึ่งแรก (ปีที่ 0-15) ไม่มีกฎหมายเลย
 // ครึ่งหลัง (ปีที่ 15-30) ให้ผู้นำทุกถิ่นฐาน ณ ตอนนั้นเปิดกฎหมายทั้ง 2 ข้อ เพื่อเทียบผลกระทบก่อน-หลัง
 // (คลังภาษี/จำนวนครั้งที่ถูก block-penalize การเก็บทรัพยากร) และระบบอาชีพที่เกิดเอง (เฟส 9): การกระจาย
-// อาชีพของตัวละครทั้งหมด (แทนที่ basic-income เดิมของเฟส 6 ทั้งหมด) แล้วบันทึก snapshot สุดท้ายขึ้น
-// Google Drive เหมือน demo:storage
+// อาชีพของตัวละครทั้งหมด (แทนที่ basic-income เดิมของเฟส 6 ทั้งหมด) รวมถึงระบบ need ที่เปลี่ยนตามสภาพสังคม
+// (เฟส 10): ดัชนีความฝืดเคือง/ความเหลื่อมล้ำ/ภาระกฎหมายเฉลี่ยทั้งโลก กับ decay modifier เฉลี่ยของ need
+// ทั้ง 4 ตัวทุก 5 ปี แล้วบันทึก snapshot สุดท้ายขึ้น Google Drive เหมือน demo:storage
 import { World } from '../src/world/world.js';
 import { Character } from '../src/characters/character.js';
 import { updateCharacter } from '../src/characters/utility-ai.js';
@@ -25,6 +26,8 @@ import { createRng } from '../src/world/random.js';
 import { PROFESSION_REGISTRY } from '../src/professions/profession.js';
 import { ProfessionAssignmentTracker } from '../src/professions/profession-assignment.js';
 import { IncomeSupportGenerator, ProfessionIncomeTracker } from '../src/professions/income-generation.js';
+import { computeConditionIndices } from '../src/social-conditions/condition-index.js';
+import { NeedsConditionModifier, computeDecayModifiers } from '../src/social-conditions/needs-condition-modifier.js';
 
 const TICKS_PER_YEAR = DEFAULT_TICKS_PER_YEAR; // 1 ปีเกมจริง = 365 tick (ไม่ย่อเหมือน demo:storage)
 const YEARS_TO_SIMULATE = 30;
@@ -152,6 +155,23 @@ function printReport(year, settlements) {
   console.log(
     `อาชีพ: ${distributionParts.join(', ')}, ยังไม่มีอาชีพ=${unemployedCount}คน`,
   );
+
+  if (settlements.length > 0) {
+    const allIndices = settlements.map((s) =>
+      computeConditionIndices(s, characters, economy.inflation.cumulativeIndex, governance.lawsetRegistry),
+    );
+    const allModifiers = allIndices.map((indices) => computeDecayModifiers(indices));
+    const avgOf = (list, key) => list.reduce((sum, v) => sum + v[key], 0) / list.length;
+
+    console.log(
+      `ดัชนีสภาพสังคมเฉลี่ยทุกถิ่นฐาน: ความฝืดเคือง=${avgOf(allIndices, 'economicHardship').toFixed(2)}, ` +
+        `ความเหลื่อมล้ำ=${avgOf(allIndices, 'inequality').toFixed(2)}, ภาระกฎหมาย=${avgOf(allIndices, 'lawBurden').toFixed(2)}`,
+    );
+    console.log(
+      'decay modifier เฉลี่ยทุกถิ่นฐาน: ' +
+        NEED_PRIORITY.map((key) => `${key}=${avgOf(allModifiers, key).toFixed(2)}`).join(' '),
+    );
+  }
 }
 
 // คำนวณเขตสี่เหลี่ยมล้อมรอบที่พักทั้งหมดของถิ่นฐาน (บวก margin) ใช้เป็นพารามิเตอร์ territorial_access
@@ -200,6 +220,10 @@ let governanceEnabled = false;
 const incomeSupport = new IncomeSupportGenerator({ randomFn: createRng(19700101) });
 const professionAssignment = new ProfessionAssignmentTracker();
 const professionIncome = new ProfessionIncomeTracker();
+// เฟส 10 (need ตามสภาพสังคม): ห่อ character.decayNeeds จากภายนอกทั้งหมด ไม่แก้ needs-config.js/character.js
+// เลย (ดูเหตุผล/การ tune เต็มใน README) ต้อง wrapCharacter() ตัวละครทุกตัวก่อนอย่างน้อยครั้งเดียว (เรียก
+// ซ้ำได้ทุก tick อย่างปลอดภัย เพราะเป็น idempotent) แล้วอัปเดต modifier ของทุกถิ่นฐานก่อน updateCharacter()
+const needsConditionModifier = new NeedsConditionModifier();
 const GOVERNANCE_START_YEAR = 15; // ครึ่งแรก (0-15 ปี) ไม่มีกฎหมายเลย ครึ่งหลัง (15-30 ปี) เปิดกฎหมายทั้ง 2 ข้อ
 
 const TOTAL_TICKS = TICKS_PER_YEAR * YEARS_TO_SIMULATE;
@@ -220,8 +244,12 @@ for (let t = 1; t <= TOTAL_TICKS; t++) {
   }
 
   governance.setSettlements(settlements);
+  // ใช้ settlements/cumulativeIndex ของ tick ก่อนหน้า (lag 1 tick เหมือน governance.setSettlements()
+  // ด้านบน) คำนวณ modifier ก่อนเริ่ม loop ตัวละคร เพราะ decayNeeds ถูกเรียกเป็นบรรทัดแรกสุดใน updateCharacter()
+  needsConditionModifier.updateSettlementModifiers(settlements, characters, economy.inflation.cumulativeIndex, governance.lawsetRegistry);
   for (const character of characters) {
     governance.setCurrentHarvester(character);
+    needsConditionModifier.wrapCharacter(character);
     updateCharacter(character, world, characters, 1);
     updateStuckTracking(character);
     professionAssignment.observeBehavior(character, world, t);

@@ -14,6 +14,7 @@
     "demo:trade": "node src/trade/demo.js",
     "demo:governance": "node src/governance/demo.js",
     "demo:professions": "node src/professions/demo.js",
+    "demo:social-needs": "node src/social-conditions/demo.js",
     "long-run": "node scripts/long-run.js",
     "test": "node --test"
   },
