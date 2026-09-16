@@ -2,9 +2,9 @@
 // รันจำลองโลกยาว 30 ปีในเกม กับตัวละครหลายตัว แบบเงียบ (ไม่ log ทุก tick) เพื่อดูแนวโน้มระยะยาว
 // ของ needs เฉลี่ย จำนวนที่พักที่สร้างสำเร็จสะสม และจับสัญญาณตัวละครที่ AI น่าจะมีปัญหา
 // (need ตัวใดตัวหนึ่งค้างต่ำกว่า 20 ติดต่อกันนานเกิน 3 ปีเกม) รวมถึงระบบสังคม/ถิ่นฐาน (เฟส 4): จำนวน
-// ถิ่นฐาน, ประชากรรวม (นับตัวละครที่เกิดใหม่ด้วย), ผู้นำแต่ละถิ่นฐาน และระบบเศรษฐกิจ xcoin (เฟส 6):
-// ยอด xcoin เฉลี่ยต่อถิ่นฐาน กับอัตราเงินเฟ้อ/ดัชนีราคาสะสม แล้วบันทึก snapshot สุดท้ายขึ้น Google Drive
-// เหมือน demo:storage
+// ถิ่นฐาน, ประชากรรวม (นับตัวละครที่เกิดใหม่ด้วย), ผู้นำแต่ละถิ่นฐาน, ระบบเศรษฐกิจ xcoin (เฟส 6):
+// ยอด xcoin เฉลี่ยต่อถิ่นฐาน กับอัตราเงินเฟ้อ/ดัชนีราคาสะสม, และระบบแลกเปลี่ยน (เฟส 7): จำนวนธุรกรรมรวม
+// แยกประเภท xcoin/barter สะสม แล้วบันทึก snapshot สุดท้ายขึ้น Google Drive เหมือน demo:storage
 import { World } from '../src/world/world.js';
 import { Character } from '../src/characters/character.js';
 import { updateCharacter } from '../src/characters/utility-ai.js';
@@ -13,7 +13,11 @@ import { saveSnapshot } from '../src/storage/save-snapshot.js';
 import { DEFAULT_TICKS_PER_YEAR } from '../src/storage/snapshot-scheduler.js';
 import { SocietySystem } from '../src/society/society-system.js';
 import { EconomySystem } from '../src/economy/economy-system.js';
+import { InflationTracker } from '../src/economy/inflation.js';
+import { BasicIncomeGenerator } from '../src/economy/basic-income.js';
 import { getSettlementAverageBalance } from '../src/economy/settlement-economy.js';
+import { TradeSystem } from '../src/trade/trade-system.js';
+import { createRng } from '../src/world/random.js';
 
 const TICKS_PER_YEAR = DEFAULT_TICKS_PER_YEAR; // 1 ปีเกมจริง = 365 tick (ไม่ย่อเหมือน demo:storage)
 const YEARS_TO_SIMULATE = 30;
@@ -117,10 +121,20 @@ function printReport(year, settlements) {
     `ดัชนีราคาสะสม (เงินเฟ้อ): ${economy.inflation.cumulativeIndex.toFixed(3)} ` +
       `(เทียบเท่าเงินเฟ้อสะสม ${((economy.inflation.cumulativeIndex - 1) * 100).toFixed(1)}% จากปีที่ 0)`,
   );
+  console.log(
+    `ธุรกรรมสะสม: xcoin ${trade.totalXcoinTransactions} ครั้ง, barter ${trade.totalBarterTransactions} ครั้ง`,
+  );
 }
 
 const society = new SocietySystem();
-const economy = new EconomySystem();
+// เฟส 6 (เงินเฟ้อ/รายได้พื้นฐาน) ใช้ Math.random() จริงโดย default ทำให้ผลรันแต่ละครั้งไม่เหมือนกัน
+// ขัดกับหลักการ "ใช้ seed คงที่ให้ผลลัพธ์ทำนายได้" ของสคริปต์นี้ (ตั้งแต่เฟส 4/5 ที่ตัวละคร/โลกใช้ seed
+// คงที่อยู่แล้ว) จึงฉีด RNG ที่มี seed คงที่ (createRng เดิมจาก src/world/random.js) เข้าไปแทน
+const economy = new EconomySystem({
+  inflation: new InflationTracker({ randomFn: createRng(20260916) }),
+  basicIncome: new BasicIncomeGenerator({ randomFn: createRng(19700101) }),
+});
+const trade = new TradeSystem();
 
 const TOTAL_TICKS = TICKS_PER_YEAR * YEARS_TO_SIMULATE;
 console.log(
@@ -138,6 +152,7 @@ for (let t = 1; t <= TOTAL_TICKS; t++) {
   // ซึ่งจะเข้าร่วมลูปรอบ tick ถัดไปโดยอัตโนมัติ)
   const settlements = society.update(world, characters, t);
   economy.update(world, characters);
+  trade.update(world, characters, economy.inflation.cumulativeIndex);
 
   if (t % (TICKS_PER_YEAR * YEARS_PER_REPORT) === 0) {
     printReport(t / TICKS_PER_YEAR, settlements);
