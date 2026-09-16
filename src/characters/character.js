@@ -19,6 +19,15 @@ export class Character {
     };
     this.inventory = { wood: 0 };
     this.currentBehavior = null;
+    // เฟส 4 (ระบบสังคม/ถิ่นฐาน): ถิ่นฐานที่ตัวละครนี้ถือว่าเป็น "บ้าน" กับ tick ที่เริ่มเป็นแบบนั้น
+    // อัปเดตอัตโนมัติโดย src/society/home-tracker.js ไม่ได้ตั้งค่าตรงนี้ตอนสร้างตัวละคร
+    this.homeSettlementId = null;
+    this.homeSettlementSinceTick = null;
+    // tick ที่ตัวละครนี้ "เกิด" — ตัวละครที่สร้างตรงๆ ตอนเริ่มโลก (ไม่ได้เกิดจาก reproduction.js)
+    // ถือว่าเกิดที่ tick 0 (มีมาตั้งแต่ต้น) ตัวละครที่เกิดจาก reproduction.js จะถูกตั้งค่านี้ทับเป็น tick จริง
+    // ที่เกิด เพื่อให้ reproduction.js เช็คอายุขั้นต่ำก่อนอนุญาตให้มีลูกได้ (กันลูกที่เพิ่งเกิดจับคู่กับ
+    // พ่อ/แม่ตัวเองทันทีเพราะ needs เต็ม 100 อยู่ติดกัน จนเกิดลูกวนไม่หยุดทั้งที่มี cooldown ต่อคู่แล้ว)
+    this.bornAtTick = 0;
   }
 
   // ลด needs ทุกตัวตามอัตรา decay คูณจำนวน tick ที่ผ่านไป ไม่ต่ำกว่า 0

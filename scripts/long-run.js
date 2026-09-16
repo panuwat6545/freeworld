@@ -1,7 +1,8 @@
 // เครื่องมือสำรวจ (ไม่ใช่ demo ปกติ ไม่นับรวมใน Definition of Done ของเฟสไหน)
 // รันจำลองโลกยาว 30 ปีในเกม กับตัวละครหลายตัว แบบเงียบ (ไม่ log ทุก tick) เพื่อดูแนวโน้มระยะยาว
 // ของ needs เฉลี่ย จำนวนที่พักที่สร้างสำเร็จสะสม และจับสัญญาณตัวละครที่ AI น่าจะมีปัญหา
-// (need ตัวใดตัวหนึ่งค้างต่ำกว่า 20 ติดต่อกันนานเกิน 3 ปีเกม) แล้วบันทึก snapshot สุดท้ายขึ้น
+// (need ตัวใดตัวหนึ่งค้างต่ำกว่า 20 ติดต่อกันนานเกิน 3 ปีเกม) รวมถึงระบบสังคม/ถิ่นฐาน (เฟส 4): จำนวน
+// ถิ่นฐาน, ประชากรรวม (นับตัวละครที่เกิดใหม่ด้วย), และผู้นำแต่ละถิ่นฐาน แล้วบันทึก snapshot สุดท้ายขึ้น
 // Google Drive เหมือน demo:storage
 import { World } from '../src/world/world.js';
 import { Character } from '../src/characters/character.js';
@@ -9,6 +10,7 @@ import { updateCharacter } from '../src/characters/utility-ai.js';
 import { NEED_PRIORITY } from '../src/characters/needs-config.js';
 import { saveSnapshot } from '../src/storage/save-snapshot.js';
 import { DEFAULT_TICKS_PER_YEAR } from '../src/storage/snapshot-scheduler.js';
+import { SocietySystem } from '../src/society/society-system.js';
 
 const TICKS_PER_YEAR = DEFAULT_TICKS_PER_YEAR; // 1 ปีเกมจริง = 365 tick (ไม่ย่อเหมือน demo:storage)
 const YEARS_TO_SIMULATE = 30;
@@ -43,6 +45,12 @@ for (const character of characters) {
 }
 
 function updateStuckTracking(character) {
+  // ตัวละครที่เกิดใหม่จากการขยายเผ่าพันธุ์ (เฟส 4) ยังไม่มี entry มาก่อน สร้างให้ตอนเจอครั้งแรก
+  if (!stuckStreaks.has(character.id)) {
+    stuckStreaks.set(character.id, Object.fromEntries(NEED_PRIORITY.map((key) => [key, 0])));
+    flaggedNeeds.set(character.id, new Set());
+  }
+
   const streaks = stuckStreaks.get(character.id);
   const flagged = flaggedNeeds.get(character.id);
   for (const key of NEED_PRIORITY) {
@@ -67,11 +75,11 @@ function averageNeeds() {
   return Object.fromEntries(NEED_PRIORITY.map((key) => [key, totals[key] / characters.length]));
 }
 
-function printReport(year) {
+function printReport(year, settlements) {
   const averages = averageNeeds();
   const shelterCount = world.structures.filter((s) => s.type === 'shelter').length;
   const problemCharacters = characters
-    .map((c) => ({ id: c.id, needs: [...flaggedNeeds.get(c.id)] }))
+    .map((c) => ({ id: c.id, needs: [...(flaggedNeeds.get(c.id) ?? [])] }))
     .filter((entry) => entry.needs.length > 0);
 
   console.log(`\n=== สรุปผล ณ ปีที่ ${year} ===`);
@@ -88,7 +96,21 @@ function printReport(year) {
         problemCharacters.map((p) => `#${p.id}(${p.needs.join(',')})`).join(', '),
     );
   }
+
+  console.log(`จำนวนถิ่นฐาน: ${settlements.length} | ประชากรรวม: ${characters.length} ตัว`);
+  if (settlements.length === 0) {
+    console.log('  (ยังไม่มีถิ่นฐานเกิดขึ้น)');
+  } else {
+    for (const s of settlements) {
+      console.log(
+        `  ถิ่นฐาน #${s.id}: สมาชิก ${s.memberIds.length} คน, ที่พัก ${s.structureIds.length} หลัง, ` +
+          `ผู้นำ=${s.leaderId !== null ? `#${s.leaderId}` : 'ยังไม่มี'}`,
+      );
+    }
+  }
 }
+
+const society = new SocietySystem();
 
 const TOTAL_TICKS = TICKS_PER_YEAR * YEARS_TO_SIMULATE;
 console.log(
@@ -102,9 +124,12 @@ for (let t = 1; t <= TOTAL_TICKS; t++) {
     updateCharacter(character, world, characters, 1);
     updateStuckTracking(character);
   }
+  // เรียกหลัง update ตัวละครทุกตัวในรอบนี้เสร็จแล้ว (อาจ push ตัวละครใหม่เข้า characters ถ้าเกิดลูก
+  // ซึ่งจะเข้าร่วมลูปรอบ tick ถัดไปโดยอัตโนมัติ)
+  const settlements = society.update(world, characters, t);
 
   if (t % (TICKS_PER_YEAR * YEARS_PER_REPORT) === 0) {
-    printReport(t / TICKS_PER_YEAR);
+    printReport(t / TICKS_PER_YEAR, settlements);
   }
 }
 
