@@ -3,6 +3,7 @@
 import { RESOURCE_TYPES } from '../../../src/world/resource-types.js';
 import { BLUEPRINTS } from '../../../src/building/blueprints.js';
 import { drawSprite } from './sprite-utils.js';
+import { CharacterDirectionTracker } from './character-direction.js';
 import {
   GRASS_SPRITE,
   GRASS_PALETTE,
@@ -16,13 +17,19 @@ import {
   FOOD_PALETTE,
   SHELTER_SPRITE,
   SHELTER_PALETTE,
-  CHARACTER_FRAME_A,
-  CHARACTER_FRAME_B,
+  CHARACTER_SPRITES,
   buildCharacterPalette,
+  getToolSpriteFor,
 } from './sprites.js';
 
 export const TILE_SIZE = 20; // พิกเซลจริงบนจอต่อ 1 ช่อง grid (sprite tile กว้าง 10 พิกเซล x2 พอดี ไม่มีรอยต่อ)
 const SPRITE_PIXEL = TILE_SIZE / 10;
+const CHARACTER_SPRITE_WIDTH = 16; // ความกว้างต้นทางของ sprite ตัวละคร (16x20 — ดูเหตุผลใน sprites.js)
+const CHARACTER_ONSCREEN_WIDTH = CHARACTER_SPRITE_WIDTH * SPRITE_PIXEL;
+const TOOL_VERTICAL_OFFSET = 11 * SPRITE_PIXEL; // ระดับความสูงประมาณ "มือ" ของตัวละคร ใช้วางเครื่องมือ
+const TOOL_ATTACH_OVERLAP = 4; // พิกเซลที่ให้เครื่องมือ "เหลื่อม" เข้าไปในตัวละครเล็กน้อยให้ดูเหมือนถืออยู่จริง
+
+const directionTracker = new CharacterDirectionTracker();
 
 const RESOURCE_SPRITE_BY_TYPE = {
   [RESOURCE_TYPES.WOOD]: [WOOD_SPRITE, WOOD_PALETTE],
@@ -91,15 +98,34 @@ function isWalkFrameB(nowMs) {
   return Math.floor(nowMs / 500) % 2 === 1;
 }
 
+// วางเครื่องมือประจำอาชีพ (ถ้ามี) เป็น overlay แยกข้างตัวละคร — ฝั่งซ้ายเมื่อหันซ้าย ฝั่งขวาในทิศอื่นๆ
+// ทั้งหมด (ลง/ขึ้น/ขวา) เพื่อให้มีกฎเดียวที่เข้าใจง่ายแทนการไล่ตำแหน่งทีละทิศ
+function drawCharacterTool(ctx, character, direction, charX, charY) {
+  const tool = getToolSpriteFor(character.profession);
+  if (!tool) return;
+
+  const toolOnscreenWidth = tool.grid[0].length * SPRITE_PIXEL;
+  const toolX =
+    direction === 'left'
+      ? charX - toolOnscreenWidth + TOOL_ATTACH_OVERLAP
+      : charX + CHARACTER_ONSCREEN_WIDTH - TOOL_ATTACH_OVERLAP;
+  const toolY = charY + TOOL_VERTICAL_OFFSET;
+
+  drawSprite(ctx, tool.grid, tool.palette, toolX, toolY, SPRITE_PIXEL);
+}
+
 function drawCharacters(ctx, characters, nowMs, selectedCharacterId) {
-  const frame = isWalkFrameB(nowMs) ? CHARACTER_FRAME_B : CHARACTER_FRAME_A;
+  const frameIndex = isWalkFrameB(nowMs) ? 1 : 0;
 
   for (const character of characters) {
+    const direction = directionTracker.getDirection(character);
+    const frame = CHARACTER_SPRITES[direction][frameIndex];
     const palette = buildCharacterPalette(character.profession);
     const x = character.position.x * TILE_SIZE;
-    // ตัวละครสูงกว่า tile (14 แถว vs 10) ให้เท้า (แถวล่างสุด) ตรงกับพื้นของช่อง grid พอดี เหมือนที่พัก
+    // ตัวละครสูงกว่า tile (20 แถว vs 10) ให้เท้า (แถวล่างสุด) ตรงกับพื้นของช่อง grid พอดี เหมือนที่พัก
     const y = character.position.y * TILE_SIZE - (frame.length - 10) * SPRITE_PIXEL;
     drawSprite(ctx, frame, palette, x, y, SPRITE_PIXEL);
+    drawCharacterTool(ctx, character, direction, x, y);
 
     if (character.id === selectedCharacterId) {
       ctx.save();
