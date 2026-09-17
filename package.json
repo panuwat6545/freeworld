@@ -16,10 +16,15 @@
     "demo:professions": "node src/professions/demo.js",
     "demo:social-needs": "node src/social-conditions/demo.js",
     "long-run": "node scripts/long-run.js",
+    "build:client": "node client/build.js",
+    "dev:client": "node client/build.js --watch",
+    "server": "node server/index.js",
     "test": "node --test"
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "esbuild": "^0.28.2",
+    "express": "^5.2.1",
     "googleapis": "^181.0.0"
   }
 }
