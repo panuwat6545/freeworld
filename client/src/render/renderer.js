@@ -5,21 +5,24 @@ import { BLUEPRINTS } from '../../../src/building/blueprints.js';
 import { drawSprite } from './sprite-utils.js';
 import { CharacterDirectionTracker } from './character-direction.js';
 import {
-  GRASS_SPRITE,
+  GRASS_SPRITES,
   GRASS_PALETTE,
   WOOD_SPRITE,
   WOOD_PALETTE,
-  WATER_SPRITE,
+  WATER_FRAMES,
   WATER_PALETTE,
   ORE_SPRITE,
   ORE_PALETTE,
   FOOD_SPRITE,
   FOOD_PALETTE,
   SHELTER_SPRITE,
-  SHELTER_PALETTE,
+  SHELTER_PALETTE_RED,
+  SHELTER_PALETTE_BLUE,
   CHARACTER_SPRITES,
   buildCharacterPalette,
   getToolSpriteFor,
+  SHADOW_SPRITE,
+  SHADOW_PALETTE,
 } from './sprites.js';
 
 export const TILE_SIZE = 20; // พิกเซลจริงบนจอต่อ 1 ช่อง grid (sprite tile กว้าง 10 พิกเซล x2 พอดี ไม่มีรอยต่อ)
@@ -28,37 +31,70 @@ const CHARACTER_SPRITE_WIDTH = 16; // ความกว้างต้นทา
 const CHARACTER_ONSCREEN_WIDTH = CHARACTER_SPRITE_WIDTH * SPRITE_PIXEL;
 const TOOL_VERTICAL_OFFSET = 11 * SPRITE_PIXEL; // ระดับความสูงประมาณ "มือ" ของตัวละคร ใช้วางเครื่องมือ
 const TOOL_ATTACH_OVERLAP = 4; // พิกเซลที่ให้เครื่องมือ "เหลื่อม" เข้าไปในตัวละครเล็กน้อยให้ดูเหมือนถืออยู่จริง
+const SHADOW_ONSCREEN_WIDTH = SHADOW_SPRITE[0].length * SPRITE_PIXEL;
+const SHADOW_ONSCREEN_HEIGHT = SHADOW_SPRITE.length * SPRITE_PIXEL;
 
 const directionTracker = new CharacterDirectionTracker();
 
+// เลือกลายหญ้า (dappled) 1 ใน 4 แบบต่อ tile แบบ deterministic ด้วย hash ของพิกัด grid เอง — ใช้พิกัดเป็น
+// seed เสมอ (ไม่ผูกกับเวลา/เฟรม) ผลลัพธ์จึงเหมือนเดิมทุกครั้งที่ tile เดียวกันถูกวาดซ้ำ ไม่มีทางกะพริบเปลี่ยน
+// ลายไปมาระหว่างเฟรมแม้จะดู "สุ่ม" ก็ตาม (integer hash แบบคลาสสิกด้วยเลขจำนวนเฉพาะขนาดใหญ่ 2 ตัว)
+function grassVariantIndex(x, y) {
+  const h = (x * 374761393 + y * 668265263) >>> 0;
+  return h % GRASS_SPRITES.length;
+}
+
+// เดินสลับเฟรมระลอกคลื่นน้ำทุกๆ 600ms จริง (ช้ากว่า walk cycle ตัวละครเล็กน้อยให้ดูเหมือนน้ำกระเพื่อมเบาๆ
+// ไม่ใช่กระพริบเร็วเกินจริง) ไม่ผูกกับความเร็วเวลาซิมูเลชันเหมือน isWalkFrameB()
+function isWaterFrameB(nowMs) {
+  return Math.floor(nowMs / 600) % 2 === 1;
+}
+
+// หาว่าที่พักหลังนี้ (structureId) เป็นของถิ่นฐานลำดับที่เท่าไหร่ (index ใน settlements array) เพื่อเลือก
+// เฉดสีหลังคาให้ต่างกันตามถิ่นฐาน — คืนค่า -1 ถ้ายังไม่สังกัดถิ่นฐานไหนเลย (ใช้เฉดแดงเป็นค่าเริ่มต้น)
+function settlementIndexForStructure(structureId, settlements) {
+  return settlements.findIndex((settlement) => settlement.structureIds.includes(structureId));
+}
+
+// น้ำไม่ได้อยู่ในตารางนี้ เพราะมี 2 เฟรมสลับกันตามเวลา (ดู waterFrame ใน drawTerrain) ต่างจากทรัพยากรอื่นที่
+// เป็น sprite นิ่งเฟรมเดียว
 const RESOURCE_SPRITE_BY_TYPE = {
   [RESOURCE_TYPES.WOOD]: [WOOD_SPRITE, WOOD_PALETTE],
-  [RESOURCE_TYPES.WATER]: [WATER_SPRITE, WATER_PALETTE],
   [RESOURCE_TYPES.ORE]: [ORE_SPRITE, ORE_PALETTE],
   [RESOURCE_TYPES.FOOD]: [FOOD_SPRITE, FOOD_PALETTE],
 };
 
-// วาดพื้นหญ้าเต็มโลก + ทรัพยากรที่ยังไม่หมด (amount > 0) ทับด้านบน
-function drawTerrain(ctx, world) {
+// วาดพื้นหญ้าเต็มโลก (ลายจุดสุ่มแบบ deterministic ต่อ tile) + ทรัพยากรที่ยังไม่หมด (amount > 0) ทับด้านบน
+// (น้ำมี 2 เฟรมสลับกันจำลองระลอกคลื่นเบาๆ ตามเวลาจริง)
+function drawTerrain(ctx, world, nowMs) {
+  const waterFrame = WATER_FRAMES[isWaterFrameB(nowMs) ? 1 : 0];
+
   world.grid.forEachCell((cell) => {
     const x = cell.x * TILE_SIZE;
     const y = cell.y * TILE_SIZE;
-    drawSprite(ctx, GRASS_SPRITE, GRASS_PALETTE, x, y, SPRITE_PIXEL);
+    drawSprite(ctx, GRASS_SPRITES[grassVariantIndex(cell.x, cell.y)], GRASS_PALETTE, x, y, SPRITE_PIXEL);
 
     if (cell.resourceNode && cell.resourceNode.amount > 0) {
-      const entry = RESOURCE_SPRITE_BY_TYPE[cell.resourceNode.type];
-      if (entry) drawSprite(ctx, entry[0], entry[1], x, y, SPRITE_PIXEL);
+      if (cell.resourceNode.type === RESOURCE_TYPES.WATER) {
+        drawSprite(ctx, waterFrame, WATER_PALETTE, x, y, SPRITE_PIXEL);
+      } else {
+        const entry = RESOURCE_SPRITE_BY_TYPE[cell.resourceNode.type];
+        if (entry) drawSprite(ctx, entry[0], entry[1], x, y, SPRITE_PIXEL);
+      }
     }
   });
 }
 
-function drawStructures(ctx, world) {
+function drawStructures(ctx, world, settlements) {
   for (const structure of world.structures) {
     if (structure.type !== BLUEPRINTS.shelter.id) continue;
     const x = structure.position.x * TILE_SIZE;
     // ที่พักสูงกว่า 1 ช่อง (12 แถว vs tile 10 แถว) ให้ฐาน (แถวล่างสุด) ตรงกับพื้นของช่อง grid พอดี
     const y = structure.position.y * TILE_SIZE - (SHELTER_SPRITE.length - 10) * SPRITE_PIXEL;
-    drawSprite(ctx, SHELTER_SPRITE, SHELTER_PALETTE, x, y, SPRITE_PIXEL);
+    // หลังคาสลับสีแดง/น้ำเงินตามลำดับถิ่นฐานที่สังกัด ให้แยกกลุ่มบ้านแต่ละถิ่นฐานออกจากกันด้วยสี
+    const settlementIndex = settlementIndexForStructure(structure.id, settlements);
+    const palette = settlementIndex >= 0 && settlementIndex % 2 === 1 ? SHELTER_PALETTE_BLUE : SHELTER_PALETTE_RED;
+    drawSprite(ctx, SHELTER_SPRITE, palette, x, y, SPRITE_PIXEL);
   }
 }
 
@@ -124,6 +160,17 @@ function drawCharacters(ctx, characters, nowMs, selectedCharacterId) {
     const x = character.position.x * TILE_SIZE;
     // ตัวละครสูงกว่า tile (20 แถว vs 10) ให้เท้า (แถวล่างสุด) ตรงกับพื้นของช่อง grid พอดี เหมือนที่พัก
     const y = character.position.y * TILE_SIZE - (frame.length - 10) * SPRITE_PIXEL;
+    const feetY = character.position.y * TILE_SIZE + TILE_SIZE;
+
+    // วาดเงาใต้เท้าก่อนตัวละครเสมอ ให้ตัวละครดูยืนทับเงาอยู่ (ขาบังเงาบางส่วนได้ตามธรรมชาติ)
+    drawSprite(
+      ctx,
+      SHADOW_SPRITE,
+      SHADOW_PALETTE,
+      x + (CHARACTER_ONSCREEN_WIDTH - SHADOW_ONSCREEN_WIDTH) / 2,
+      feetY - SHADOW_ONSCREEN_HEIGHT / 2,
+      SPRITE_PIXEL,
+    );
     drawSprite(ctx, frame, palette, x, y, SPRITE_PIXEL);
     drawCharacterTool(ctx, character, direction, x, y);
 
@@ -141,8 +188,8 @@ function drawCharacters(ctx, characters, nowMs, selectedCharacterId) {
 // รอบนี้หรือไม่ก็ตาม เพื่อให้ animation เดิน/กล้องขยับลื่นแม้ตอนหยุดเวลา)
 export function renderFrame(ctx, { world, characters, settlements }, nowMs, selectedCharacterId) {
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-  drawTerrain(ctx, world);
-  drawStructures(ctx, world);
+  drawTerrain(ctx, world, nowMs);
+  drawStructures(ctx, world, settlements);
   drawSettlementBoundaries(ctx, world, settlements);
   drawCharacters(ctx, characters, nowMs, selectedCharacterId);
 }
