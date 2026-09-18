@@ -6,6 +6,7 @@ import { BLUEPRINTS } from '../../../src/building/blueprints.js';
 import { drawSprite } from './sprite-utils.js';
 import { CharacterDirectionTracker } from './character-direction.js';
 import { getCharacterImage, getTileImage, getHouseImage, SHADOW_SPRITE, SHADOW_PALETTE } from './sprites.js';
+import { drawCharacterIndicators } from './character-status.js';
 
 export { loadSpriteImages } from './sprites.js';
 
@@ -98,8 +99,8 @@ function drawSettlementBoundaries(ctx, world, settlements) {
   });
 }
 
-function drawCharacters(ctx, characters, selectedCharacterId) {
-  for (const character of characters) {
+function drawCharacters(ctx, simulation, selectedCharacterId) {
+  for (const character of simulation.characters) {
     const direction = directionTracker.getDirection(character);
     const image = getCharacterImage(character.profession, direction);
     const width = image.naturalWidth * SPRITE_SCALE;
@@ -120,6 +121,10 @@ function drawCharacters(ctx, characters, selectedCharacterId) {
       SPRITE_SCALE,
     );
     ctx.drawImage(image, x, y, width, height);
+    // indicator (วงอาชีพ+สถานะ) วาดเหนือขอบบนของภาพเสมอ (y คือขอบบนพอดี) จึงไม่มีทางทับตัวภาพตัวละคร —
+    // panel รายละเอียดที่คลิกดูได้เป็น DOM element แยกชั้นอยู่เหนือ canvas อยู่แล้ว จึงไม่มีทางถูก indicator
+    // นี้บังเช่นกัน (ดู client/src/ui/overlay.js)
+    drawCharacterIndicators(ctx, character, simulation, x + width / 2, y);
 
     if (character.id === selectedCharacterId) {
       ctx.save();
@@ -135,12 +140,13 @@ function drawCharacters(ctx, characters, selectedCharacterId) {
 // รอบนี้หรือไม่ก็ตาม เพื่อให้กล้อง/การคลิกยังลื่นแม้ตอนหยุดเวลา) ต้อง loadSpriteImages() ให้เสร็จก่อนเรียก
 // ฟังก์ชันนี้เสมอ (ดู main.js) ไม่งั้น getCharacterImage()/getTileImage() จะคืนค่า undefined — ไม่รับ nowMs
 // อีกต่อไปเพราะภาพชุดนี้เป็นภาพนิ่งเฟรมเดียวต่อทิศทาง/ทรัพยากร ไม่มี animation ที่ผูกกับเวลาแล้ว
-export function renderFrame(ctx, { world, characters, settlements }, selectedCharacterId) {
+export function renderFrame(ctx, simulation, selectedCharacterId) {
+  const { world, settlements } = simulation;
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   drawTerrain(ctx, world);
   drawStructures(ctx, world, settlements);
   drawSettlementBoundaries(ctx, world, settlements);
-  drawCharacters(ctx, characters, selectedCharacterId);
+  drawCharacters(ctx, simulation, selectedCharacterId);
 }
 
 export function canvasSizeFor(world) {

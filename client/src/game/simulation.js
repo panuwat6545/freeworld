@@ -52,6 +52,11 @@ export class Simulation {
     this.professionAssignment = new ProfessionAssignmentTracker();
     this.professionIncome = new ProfessionIncomeTracker();
     this.needsConditionModifier = new NeedsConditionModifier();
+
+    // เฟส 11 (indicator เหนือหัว): TradeSystem.update() คืนแค่ event ของ tick นั้นแล้วทิ้ง (ไม่ได้เก็บไว้ใน
+    // src/ เลย) จึงเก็บ "tick ล่าสุดที่แต่ละตัวละครทำธุรกรรม" ไว้เองที่นี่ ให้ renderer เอาไปเทียบกับ tick
+    // ปัจจุบันเพื่อโชว์ไอคอนเหรียญค้างไว้สักพักหลังเทรดจริง (ไม่ใช่ state ของเกม แค่ข้อมูลช่วยแสดงผล)
+    this.lastTradeTickByCharacterId = new Map();
   }
 
   // เดินหน้าไปทีละ 1 tick พอดี (ลำดับ/การเชื่อมระบบเดียวกับ scripts/long-run.js เป๊ะ)
@@ -81,6 +86,16 @@ export class Simulation {
     this.governance.applyTradeLaws(tradeEvents, this.characters, this.settlements);
     this.professionAssignment.observeTradeEvents(tradeEvents, this.characters, this.tick);
     this.professionIncome.observeTradeEvents(tradeEvents, this.characters);
+    for (const deal of tradeEvents) {
+      this.lastTradeTickByCharacterId.set(deal.buyerId, this.tick);
+      this.lastTradeTickByCharacterId.set(deal.sellerId ?? deal.helperId, this.tick);
+    }
+  }
+
+  // tick ล่าสุดที่ตัวละคร id นี้ทำธุรกรรม (ซื้อ/ขาย/รับจ้าง) หรือ null ถ้ายังไม่เคยเลย — ใช้โดย
+  // client/src/render/character-status.js เพื่อโชว์ไอคอนเหรียญเหนือหัวชั่วครู่หลังเทรดจริง
+  getLastTradeTick(characterId) {
+    return this.lastTradeTickByCharacterId.get(characterId) ?? null;
   }
 
   step(ticks) {
