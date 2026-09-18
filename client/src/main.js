@@ -2,14 +2,24 @@
 // src/world, characters, building, society, economy, trade, governance, professions, social-conditions
 // ตรงๆ ไม่มีการแก้ logic เดิมเลย) เข้ากับ pixel-art renderer และ UI overlay
 import { Simulation, TICKS_PER_YEAR } from './game/simulation.js';
-import { renderFrame, canvasSizeFor, TILE_SIZE } from './render/renderer.js';
+import { renderFrame, canvasSizeFor, TILE_SIZE, loadSpriteImages } from './render/renderer.js';
 import { createOverlay } from './ui/overlay.js';
 
 const BASE_TICKS_PER_SECOND = TICKS_PER_YEAR / 36; // ความเร็วปกติ (1x): ~1 ปีเกมทุก 36 วินาทีจริง
 const MAX_TICKS_PER_FRAME = 200; // กันแท็บค้าง/สลับแท็บนานแล้วกลับมาทำให้ต้องเดินหลาย tick รวดเดียวมากเกินไป
 
-function mount() {
+async function mount() {
   const root = document.getElementById('app');
+  const loadingNotice = document.createElement('p');
+  loadingNotice.id = 'fw-loading';
+  loadingNotice.textContent = 'กำลังโหลด sprite...';
+  root.appendChild(loadingNotice);
+
+  // ต้องโหลดไฟล์ภาพ PNG ทั้งหมดให้เสร็จก่อนเริ่ม game loop เสมอ (renderFrame ใช้ img.naturalWidth/Height
+  // ของแต่ละภาพเพื่อจัดตำแหน่ง ซึ่งมีค่าถูกต้องก็ต่อเมื่อภาพโหลดเสร็จแล้วเท่านั้น)
+  await loadSpriteImages();
+  root.removeChild(loadingNotice);
+
   const canvas = document.createElement('canvas');
   canvas.id = 'fw-canvas';
   root.appendChild(canvas);
@@ -59,7 +69,7 @@ function mount() {
       }
     }
 
-    renderFrame(ctx, simulation, nowMs, overlay.state.selectedCharacterId);
+    renderFrame(ctx, simulation, overlay.state.selectedCharacterId);
     overlay.refresh();
     requestAnimationFrame(frame);
   }
@@ -67,4 +77,8 @@ function mount() {
   requestAnimationFrame(frame);
 }
 
-mount();
+mount().catch((error) => {
+  console.error(error);
+  const root = document.getElementById('app');
+  root.textContent = `โหลดเกมไม่สำเร็จ: ${error.message}`;
+});

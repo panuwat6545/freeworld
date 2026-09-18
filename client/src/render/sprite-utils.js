@@ -56,10 +56,3 @@ export function row(width, ranges, fillChar = '.') {
   }
   return cells.join('');
 }
-
-// พลิกซ้าย-ขวา grid ตัวเลข (หลัง parseSprite แล้ว) ใช้สร้าง sprite ทิศ "ขวา" จาก sprite ทิศ "ซ้าย" ที่วาดไว้
-// แล้วโดยไม่ต้องเขียน pixel ซ้ำอีกชุด (ตัวละครหันซ้าย/ขวาเป็นภาพสะท้อนกันเป๊ะ รวมถึงตำแหน่งเครื่องมือประจำ
-// อาชีพที่ฝังอยู่ในมือด้วย ถ้ามี)
-export function mirrorGrid(grid) {
-  return grid.map((line) => [...line].reverse());
-}
