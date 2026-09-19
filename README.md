@@ -1199,6 +1199,33 @@ loop), canvas render ภาพ PNG ถูกต้องครบทุกไฟ
 ซ้ำ) วาดครบทั้ง 6 อาชีพ + ทั้ง 7 สถานะ (รวม critical) ในตารางเดียวให้เห็นพร้อมกันแบบ deterministic — หน้า
 เทสต์นี้เป็นไฟล์ชั่วคราวเท่านั้น ลบออกจากโปรเจกต์แล้วหลังใช้งานเสร็จ ไม่ได้ถูก commit ไว้
 
+### เวอร์ชันสำหรับ publish เป็น Claude Artifact (preview link เล่นได้จริงโดยไม่ต้องมี server)
+
+`npm run server` เปิด Express บนเครื่องนี้เท่านั้น (localhost) จึงใช้แชร์ลิงก์ให้คนอื่นเล่นจริงไม่ได้ — เมื่อ
+ต้องการลิงก์ preview ที่เข้าเล่นได้จริงจากที่ไหนก็ได้ จึง publish เกมเป็น Claude Artifact แทน แต่หน้า
+Artifact ต้องเป็นไฟล์ HTML/JS จบในตัว (self-contained) ไม่รองรับการ fetch ไฟล์แยกจากโฟลเดอร์ `/assets/`
+แบบที่ `client/` ตัวจริงทำได้ตอนรันกับ Express — จึงมี `client/artifact/` เป็นชุด build แยกต่างหากโดยสิ้นเชิง
+(ไม่ปนกับโค้ดหลักใน `client/src/` เลยแม้แต่บรรทัดเดียว):
+
+- **`client/artifact/generate-sprite-data.js`**: อ่านไฟล์ PNG ทุกไฟล์ใน `client/assets/sprites/` แปลงเป็น
+  base64 data URI เขียนออกเป็น `client/artifact/sprite-data.generated.js` (generate อัตโนมัติ ไม่ commit
+  ไว้ — อยู่ใน `.gitignore`)
+- **`client/artifact/sprites.artifact.js`**: สำเนาของ `client/src/render/sprites.js` ที่ต่างกันจุดเดียว คือ
+  `loadImage()` ใช้ base64 data URI ที่ฝังไว้แทนการสร้าง URL ไปโหลดไฟล์แยก (`Image.src` รับ `data:` URI ได้
+  ตรงๆ ไม่ต้อง fetch เครือข่ายเลย) — ไม่ใช่โค้ดที่ `client/` ตัวจริงใช้
+- **`client/artifact/build.js`** (รันด้วย `npm run build:artifact`): generate sprite data ก่อนเสมอ แล้ว
+  bundle `client/src/main.js` **ตัวจริงเป๊ะ** (ไม่มีสำเนา ไม่แก้ไข) ด้วย esbuild เหมือน `client/build.js`
+  ทุกประการ ต่างแค่เพิ่ม resolve plugin ที่สลับ `import './sprites.js'` ของ `renderer.js` ให้ไปเป็น
+  `sprites.artifact.js` แทน — ระบบซิมูเลชัน/เรนเดอร์อื่นๆ ทั้งหมดใช้โค้ดตัวเดียวกับที่รันจริงบน Express
+- **`client/artifact/index.html`**: เหมือน `client/index.html` ตัวจริงทุกประการ (แค่ตัด `<!doctype>`/
+  `<html>`/`<head>`/`<body>` ออกตามข้อกำหนดของหน้า Artifact ที่ห่อ skeleton ให้เองอยู่แล้ว) เพิ่มข้อความแจ้ง
+  ผู้เล่นว่าปุ่ม "บันทึกเกม" ใช้ไม่ได้ในโหมด preview (ต้องมี Node server + Google Drive credential ซึ่งหน้า
+  Artifact ไม่มี)
+
+ผลลัพธ์ `client/artifact/dist/bundle.js` จึง**ไม่มีการ fetch ไฟล์ภาพแยกเลยแม้แต่ไฟล์เดียว** (ยืนยันด้วย
+headless Chromium: 0 failed request ไปยัง `/assets/` หลังเปลี่ยนมาใช้ embedded data URI) publish ขึ้น
+Claude Artifact ได้มี 2 ไฟล์เท่านั้น (`index.html` + `dist/bundle.js`) ไม่มีไฟล์ภาพแยกอีกต่อไป
+
 ### วิธีทดสอบ (smoke test)
 
 ```bash

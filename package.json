@@ -18,6 +18,7 @@
     "long-run": "node scripts/long-run.js",
     "build:client": "node client/build.js",
     "dev:client": "node client/build.js --watch",
+    "build:artifact": "node client/artifact/build.js",
     "server": "node server/index.js",
     "test": "node --test"
   },

@@ -3,3 +3,5 @@ node_modules/
 .env.*
 *.log
 client/dist/
+client/artifact/dist/
+client/artifact/sprite-data.generated.js
