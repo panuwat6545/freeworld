@@ -1,0 +1,143 @@
+{
+  "$comment": "STEP 4 foundation. See docs/DECISIONS.md for full reasoning per field. min/max are CANONICAL_DERIVED (FREEWORLD_REVAMP_5.1.md §9.5 health-bar color bands span exactly '0-35 red / 35-60 yellow / 60-100 green', which fixes the numeric range at [0, 100] even though v5.1 never states the range as a rule on its own). goodThreshold=60 and tiredThreshold=35 are CANONICAL — given directly, verbatim, by the STEP 4 checkpoint command itself ('health > 60 GOOD; 35 <= health <= 60 TIRED; health < 35 HALTED'), which resolves the boundary-inclusivity ambiguity left open by v5.1 §9.5's overlapping band notation (the bands touch at 35 and 60 without stating which side owns the boundary). statuses map to v5.1 §9.3's own sidebar status words ('ไปได้ดี' / 'เริ่มเหนื่อย' / 'หยุดชะงัก') translated to stable English implementation identifiers (CANONICAL_DERIVED — the concept and semantics are canonical, the exact string identifiers are implementation choices).",
+  "min": 0,
+  "minStatus": "CANONICAL_DERIVED",
+  "max": 100,
+  "maxStatus": "CANONICAL_DERIVED",
+  "goodThreshold": 60,
+  "goodThresholdStatus": "CANONICAL",
+  "tiredThreshold": 35,
+  "tiredThresholdStatus": "CANONICAL",
+  "statuses": {
+    "good": "GOOD",
+    "tired": "TIRED",
+    "halted": "HALTED"
+  },
+  "statusesStatus": "CANONICAL_DERIVED",
+  "recovery": {
+    "$comment": "STEP 13B-21 — implements the Recovery design locked by STEP 13B-18/19/20 and approved by the controller for this STEP. v5.1 gives no formula or numbers for this at all (it was never part of v5.1 — this is a NEW_PRODUCT_DECISION, not a canonical/derived value). Scope: ONLY the 4 sectors that no policy ever positively targets (fiscal/housing/ai-era/admin) recover here; import-export and the other 5 sectors are never touched by this mechanic (see eligibleSectorIds). This is a SEPARATE accumulator from the policy-effects accumulator in collectSectorHealthDeltas()/applySectorTick() — see src/engine/sectors/recovery.js — applied strictly after policy effects are finalized for the month, and only to a sector with zero active negative policy effect targeting it that same month (never fights an active policy, per STEP 13B-18/19's own exploit analysis).",
+    "targetHealth": 50,
+    "targetHealthStatus": "NEW_PRODUCT_DECISION (STEP 13B-21) — reuses the same neutral midpoint convention already used everywhere else in this codebase (initialHealth=50, GDP neutralHealth=50, population statBaseline=50) rather than inventing a different reference point for recovery specifically.",
+    "rate": 0.03,
+    "rateStatus": "NEW_PRODUCT_DECISION (STEP 13B-21, approved by controller from the STEP 13B-20 parameter sweep: 2%/3%/5%/7% were compared across healthy/moderate/severe scenarios; 3% was chosen as a moderate rate — materially better than 2% under moderate stress, without taking on 5-7%'s larger patient-player exploit payoff documented in STEP 13B-20 Section 3/5). Fraction of the remaining gap to targetHealth recovered per eligible month — see src/engine/sectors/recovery.js for the exact formula, which structurally can never overshoot targetHealth.",
+    "cooldownMonths": 6,
+    "cooldownMonthsStatus": "NEW_PRODUCT_DECISION (STEP 13B-21, approved by controller from the STEP 13B-20 parameter sweep: 3/6/9 consecutive months were compared; 6 was chosen because it fully blocks a short (2-month) remove/wait/replace cycle at every tested rate, while costing only ~2 months of severe-collapse recovery speed versus the fastest-tested cooldown of 3, at every rate). Number of consecutive months a sector must have zero active negative policy effect targeting it before recovery begins; any month with such an effect active resets the counter to 0 (see src/engine/sectors/recovery.js).",
+    "eligibleSectorIds": ["fiscal", "housing", "ai-era", "admin"],
+    "eligibleSectorIdsStatus": "NEW_PRODUCT_DECISION (STEP 13B-21, approved by controller, carried from STEP 13B-18/19/20) — exactly the 4 sectors that are secondary-only targets of the 5 existing policies (fiscal: Agriculture+Education; housing: Transport; ai-era: Industry-Labor; admin: Commerce) and that no policy ever positively targets. import-export is deliberately excluded — it is covered instead by the new Import-Export policy added in this same STEP (config/policies.json), never by this passive mechanic, per the controller's explicit instruction not to passively recover import-export or any other sector through this mechanic."
+  },
+  "kpis": {
+    "$comment": "STEP 11A (KPI Foundation, PD-01=A). v5.1 §9.7 says literally 'น้ำหนักตั้งใน config/sector-health.json' — this is why the KPI catalog+weights live in THIS file rather than a new one, honoring that direct canonical file-path instruction. This 'kpis' key is a NEW, separate layer from the 'min'/'max'/thresholds/statuses fields above, which remain the existing accumulator's config untouched (src/engine/sectors/**) — see docs/design/PRODUCT_DECISION_PACK.md PD-01 and docs/DECISIONS.md STEP 11A entry for the migration-boundary reasoning. KPI names are CANONICAL (verbatim from v5.1 §4.1-4.10). KPI ids are PROVISIONAL_IMPLEMENTATION (slug choice only, no game meaning). weight is null/DEFERRED for every KPI in every sector — actual weight numbers are UNKNOWN_FROM_V5.1 and are tracked as the 'KPI weights' Balance TODO item (docs/design/PRODUCT_DECISION_PACK.md §17); nothing in this STEP invents a weight number. aggregationModel marks which of the two v5.1-canonical formulas (§9.7) a sector's KPIs feed: 'weighted-average' for the 9 general sectors, 'special-case' for admin (PD-02=A, Cabinet Stability + vacant-ministry count — a formula NOT built by this KPI layer; admin's KPIs are still cataloged here for completeness only).",
+    "range": { "min": 0, "max": 100 },
+    "rangeStatus": "CANONICAL_DERIVED",
+    "bySectorId": {
+      "admin": {
+        "aggregationModel": "special-case",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "approval-rating", "name": "Approval Rating", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "political-capital", "name": "Political Capital", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "cabinet-stability", "name": "Cabinet Stability", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "corruption-index", "name": "Corruption Index", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "trust-in-government", "name": "Trust in Government", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "education": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "literacy", "name": "Literacy", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "avg-education-level", "name": "Avg Education Level", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "stem-ai-skill-index", "name": "STEM/AI Skill Index", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "brain-drain", "name": "Brain Drain", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "agriculture": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "food-production", "name": "Food Production", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "food-security", "name": "Food Security", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "farmer-income", "name": "Farmer Income", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "land-use", "name": "Land Use", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "agri-tech-level", "name": "Agri-Tech Level", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "transport": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "road-rail-port-air-capacity", "name": "Road/Rail/Port/Air Capacity", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "logistics-cost", "name": "Logistics Cost", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "congestion", "name": "Congestion", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "energy-use", "name": "Energy Use", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "trade": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "domestic-trade-volume", "name": "Domestic Trade Volume", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "consumer-price-index", "name": "Consumer Price Index", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "trade-balance", "name": "Trade Balance", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "market-competition", "name": "Market Competition", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "import-export": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "export-import-value", "name": "Export/Import Value", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "tariff-revenue", "name": "Tariff Revenue", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "trade-partners-relations", "name": "Trade Partners' Relations", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "dependency-index", "name": "Dependency Index", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "fiscal": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "gdp", "name": "GDP", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "gdp-growth", "name": "GDP Growth", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "gdp-per-capita", "name": "GDP per Capita", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "budget-balance", "name": "Budget Balance", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "public-debt", "name": "Public Debt", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "inflation", "name": "Inflation", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "gini", "name": "Gini", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "housing": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "housing-supply-demand", "name": "Housing Supply/Demand", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "rent-index", "name": "Rent Index", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "homelessness", "name": "Homelessness", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "urbanization", "name": "Urbanization", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "land-value", "name": "Land Value", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "industry": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "employment-rate", "name": "Employment Rate", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "wage-level", "name": "Wage Level", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "industry-output", "name": "Industry Output", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "automation-level", "name": "Automation Level", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "ai-displacement-risk", "name": "AI Displacement Risk", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      },
+      "ai-era": {
+        "aggregationModel": "weighted-average",
+        "aggregationModelStatus": "CANONICAL",
+        "items": [
+          { "id": "digital-infrastructure", "name": "Digital Infrastructure", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "ai-talent", "name": "AI Talent", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "rd-investment", "name": "R&D Investment", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "regulation", "name": "Regulation", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" },
+          { "id": "data-governance", "name": "Data Governance", "nameStatus": "CANONICAL", "weight": null, "weightStatus": "DEFERRED" }
+        ]
+      }
+    }
+  }
+}

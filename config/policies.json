@@ -1,0 +1,91 @@
+[
+  {
+    "id": "policy-agriculture-support-01",
+    "name": "สนับสนุนภาคเกษตร (ตัวอย่าง STEP 3)",
+    "sectorId": "agriculture",
+    "cost": { "power": 1 },
+    "horizon": "mid",
+    "effects": [
+      { "domain": "sector", "target": "agriculture", "metric": "health", "operation": "add", "value": 5 },
+      { "domain": "sector", "target": "fiscal", "metric": "health", "operation": "add", "value": -2 }
+    ],
+    "effectsValueStatus": "PROVISIONAL_IMPLEMENTATION: v5.1 does not specify numeric policy effect magnitudes anywhere; +5/month is the smallest deterministic example value chosen to prove the Policy -> Sector Effect Interpreter -> Sector Health architecture (STEP 4), not a balanced gameplay number. STEP 13B-15 originally added a -1/month secondary effect on `fiscal`, implementing the agriculture->fiscal mapping locked by PD-NEXT-GOV-07 (STEP 13B-14). STEP 13B-16B changed the secondary magnitude to -2/month, implementing PD-NEXT-GOV-08 (proposed STEP 13B-16A, approved by controller for STEP 13B-16B) — chosen per STEP 13B-16's own balance audit (faster, more visible secondary saturation while the +5 primary remains dominant), uniform across all 5 policies' secondary effects per PD-NEXT-GOV-08's own implementation contract, still not a balanced gameplay number in the sense of being derived from v5.1 or playtesting — it is a controller-approved magnitude choice, not a canonical one.",
+    "primaryMinistryId": "agriculture",
+    "supportingMinistryIds": [],
+    "ministryMappingStatus": "PRODUCT DECISION (STEP 11B-2, implementing the locked PD-11 field contract): this is an illustrative, manually-authored assignment for THIS specific example policy only — v5.1 §3.1 directly names \"กระทรวงเกษตร\" (id: agriculture) as covering \"การเกษตร\", so this is the obviously correct minister for this policy's real-world subject matter. This is NOT a codified sectorId===ministryId inference rule (STEP 9A confirmed that rule fails to generalize for 7 of 10 sectors, and PD-11 explicitly forbids using it as a rule) — see docs/design/PRODUCT_DECISION_PACK.md PD-11 (locked Option A) and src/engine/government/minister-interpretation.js::resolveMinistryForPolicy(), which reads this field directly and never infers from sectorId."
+  },
+  {
+    "id": "policy-education-support-01",
+    "name": "สนับสนุนภาคการศึกษา (ตัวอย่าง STEP 3)",
+    "sectorId": "education",
+    "cost": { "power": 2 },
+    "horizon": "long",
+    "effects": [
+      { "domain": "sector", "target": "education", "metric": "health", "operation": "add", "value": 5 },
+      { "domain": "sector", "target": "fiscal", "metric": "health", "operation": "add", "value": -2 }
+    ],
+    "effectsValueStatus": "PROVISIONAL_IMPLEMENTATION: v5.1 does not specify numeric policy effect magnitudes anywhere; +5/month is the smallest deterministic example value chosen to prove the Policy -> Sector Effect Interpreter -> Sector Health architecture (STEP 4), not a balanced gameplay number. STEP 13B-15 originally added a -1/month secondary effect on `fiscal`, implementing the education->fiscal mapping locked by PD-NEXT-GOV-07 (STEP 13B-14). STEP 13B-16B changed the secondary magnitude to -2/month, implementing PD-NEXT-GOV-08 (proposed STEP 13B-16A, approved by controller for STEP 13B-16B) — chosen per STEP 13B-16's own balance audit (faster, more visible secondary saturation while the +5 primary remains dominant), uniform across all 5 policies' secondary effects per PD-NEXT-GOV-08's own implementation contract, still not a balanced gameplay number in the sense of being derived from v5.1 or playtesting — it is a controller-approved magnitude choice, not a canonical one.",
+    "primaryMinistryId": "education",
+    "supportingMinistryIds": [],
+    "ministryMappingStatus": "PRODUCT DECISION (STEP 11B-2, implementing the locked PD-11 field contract): this is an illustrative, manually-authored assignment for THIS specific example policy only — v5.1 §3.1 directly names \"กระทรวงศึกษาธิการ\" (id: education) as covering \"การศึกษา\", so this is the obviously correct minister for this policy's real-world subject matter. This is NOT a codified sectorId===ministryId inference rule (STEP 9A confirmed that rule fails to generalize for 7 of 10 sectors, and PD-11 explicitly forbids using it as a rule) — see docs/design/PRODUCT_DECISION_PACK.md PD-11 (locked Option A) and src/engine/government/minister-interpretation.js::resolveMinistryForPolicy(), which reads this field directly and never infers from sectorId."
+  },
+  {
+    "id": "policy-transport-infrastructure-01",
+    "name": "สนับสนุนโครงสร้างพื้นฐานคมนาคม (STEP 13B-10D)",
+    "sectorId": "transport",
+    "cost": { "power": 1 },
+    "horizon": "mid",
+    "effects": [
+      { "domain": "sector", "target": "transport", "metric": "health", "operation": "add", "value": 5 },
+      { "domain": "sector", "target": "housing", "metric": "health", "operation": "add", "value": -2 }
+    ],
+    "effectsValueStatus": "PROVISIONAL_IMPLEMENTATION: same deterministic +5/month example value as the existing agriculture/education policies (STEP 3) — this STEP's own explicit goal is architecture validation (proving a 3rd real ministry/sector consequence scales with zero new mechanic), not balance tuning; not a balanced gameplay number. STEP 13B-15 originally added a -1/month secondary effect on `housing`, implementing the transport->housing mapping locked by PD-NEXT-GOV-07 (STEP 13B-14). STEP 13B-16B changed the secondary magnitude to -2/month, implementing PD-NEXT-GOV-08 (proposed STEP 13B-16A, approved by controller for STEP 13B-16B) — chosen per STEP 13B-16's own balance audit (faster, more visible secondary saturation while the +5 primary remains dominant), uniform across all 5 policies' secondary effects per PD-NEXT-GOV-08's own implementation contract, still not a balanced gameplay number in the sense of being derived from v5.1 or playtesting — it is a controller-approved magnitude choice, not a canonical one.",
+    "primaryMinistryId": "transport",
+    "supportingMinistryIds": [],
+    "ministryMappingStatus": "PRODUCT DECISION (STEP 13B-10D, implementing the locked PD-11 field contract): `transport` is both the sectorId and the primaryMinistryId here, an EXACT id match — STEP 13B-10C's own audit identified this as the safest possible new-policy mapping precisely because it requires no inference at all. Still NOT a codified sectorId===ministryId rule (STEP 9A confirmed that rule fails to generalize for 7 of 10 sectors, and PD-11 explicitly forbids using it as a rule) — this is a manually-authored assignment for THIS specific policy only, read directly by src/engine/government/minister-interpretation.js::resolveMinistryForPolicy(), which never infers from sectorId for any policy, this one included."
+  },
+  {
+    "id": "policy-industry-labor-support-01",
+    "name": "สนับสนุนอุตสาหกรรมและแรงงาน (STEP 13B-10F)",
+    "sectorId": "industry",
+    "cost": { "power": 1 },
+    "horizon": "mid",
+    "effects": [
+      { "domain": "sector", "target": "industry", "metric": "health", "operation": "add", "value": 5 },
+      { "domain": "sector", "target": "ai-era", "metric": "health", "operation": "add", "value": -2 }
+    ],
+    "effectsValueStatus": "PROVISIONAL_IMPLEMENTATION: same deterministic +5/month example value as the existing agriculture/education/transport policies — this STEP's own explicit goal is architecture validation (proving a 4th real ministry/sector consequence scales with zero new mechanic), not balance tuning; not a balanced gameplay number. STEP 13B-15 originally added a -1/month secondary effect on `ai-era`, implementing the industry->ai-era mapping locked by PD-NEXT-GOV-07 (STEP 13B-14, the faithful existing-sector rendering of v5.1's named Automation-vs-Employment trade-off). STEP 13B-16B changed the secondary magnitude to -2/month, implementing PD-NEXT-GOV-08 (proposed STEP 13B-16A, approved by controller for STEP 13B-16B) — chosen per STEP 13B-16's own balance audit (faster, more visible secondary saturation while the +5 primary remains dominant), uniform across all 5 policies' secondary effects per PD-NEXT-GOV-08's own implementation contract, still not a balanced gameplay number in the sense of being derived from v5.1 or playtesting — it is a controller-approved magnitude choice, not a canonical one.",
+    "primaryMinistryId": "industry-labor",
+    "supportingMinistryIds": [],
+    "ministryMappingStatus": "EXPLICIT PRODUCT MAPPING (STEP 13B-10F, implementing the locked PD-11 field contract, following STEP 13B-10E's own APPROVE recommendation): `industry-labor` -> `industry` is an intentional, manually-authored assignment for THIS specific policy only — NOT an exact id match (unlike agriculture/education/transport) and NOT derived from any string-similarity/lexical inference rule (STEP 9A confirmed sectorId===ministryId inference fails to generalize for 7 of 10 sectors, and PD-11 explicitly forbids using it as a rule). docs/design/POLICY_MINISTRY_MAPPING_SPEC.md §5 (STEP 9A) and STEP 13B-10E's own audit (audit-only, recorded no repository file by its own explicit scope rule — its APPROVE recommendation for this exact mapping is implemented here) both found `industry-labor`'s free-text coverage (\"อุตสาหกรรม, การจ้างงาน\" - industry, employment) maps to exactly ONE sector (`industry`, \"โรงงาน-จ้างงาน\" - factories-employment) with NO competing candidate anywhere in the repository (contrast with `commerce`, which STEP 13B-10E classified CONFLICTING between `trade`/`import-export` and left unresolved/not implemented by this STEP) — this is the lowest-ambiguity new mapping available after `transport`'s own exact id match. Read directly by src/engine/government/minister-interpretation.js::resolveMinistryForPolicy(), which never infers from sectorId for any policy, this one included."
+  },
+  {
+    "id": "policy-commerce-trade-support-01",
+    "name": "สนับสนุนการค้า (STEP 13B-10H)",
+    "sectorId": "trade",
+    "cost": { "power": 1 },
+    "horizon": "mid",
+    "effects": [
+      { "domain": "sector", "target": "trade", "metric": "health", "operation": "add", "value": 5 },
+      { "domain": "sector", "target": "admin", "metric": "health", "operation": "add", "value": -2 }
+    ],
+    "effectsValueStatus": "PROVISIONAL_IMPLEMENTATION: same deterministic +5/month example value as the existing agriculture/education/transport/industry-labor policies — this STEP's own explicit goal is architecture validation (proving a 5th real ministry/sector consequence scales with zero new mechanic), not balance tuning; not a balanced gameplay number. STEP 13B-15 originally added a -1/month secondary effect on `admin`, implementing the commerce->admin mapping locked by PD-NEXT-GOV-07 (STEP 13B-14) — deliberately NOT targeting `import-export`, preserving PD-NEXT-GOV-06's commerce/foreign-customs boundary. STEP 13B-16B changed the secondary magnitude to -2/month, implementing PD-NEXT-GOV-08 (proposed STEP 13B-16A, approved by controller for STEP 13B-16B) — chosen per STEP 13B-16's own balance audit (faster, more visible secondary saturation while the +5 primary remains dominant), uniform across all 5 policies' secondary effects per PD-NEXT-GOV-08's own implementation contract, still not a balanced gameplay number in the sense of being derived from v5.1 or playtesting — it is a controller-approved magnitude choice, not a canonical one.",
+    "primaryMinistryId": "commerce",
+    "supportingMinistryIds": [],
+    "ministryMappingStatus": "EXPLICIT PRODUCT MAPPING (STEP 13B-10H, implementing the locked PD-11 field contract, implementing PD-NEXT-GOV-06, locked STEP 13B-10G — see docs/DECISIONS.md): `commerce` -> `trade` is an intentional, manually-authored assignment for THIS specific policy only — NOT an exact id match and NOT derived from any string-similarity/lexical inference rule (STEP 9A confirmed sectorId===ministryId inference fails to generalize for 7 of 10 sectors, and PD-11 explicitly forbids using it as a rule). `commerce`'s own free-text coverage (\"การค้าภายใน/ต่างประเทศ\" - trade, domestic/foreign) historically spanned both `trade` and `import-export` (STEP 9A's own POLICY_MINISTRY_MAPPING_SPEC.md §5 classified this CONFLICTING) — PD-NEXT-GOV-06 explicitly resolved that ambiguity by deliberately narrowing `commerce` to `trade` only, reserving `import-export` conceptually for `foreign-customs` — implemented as its own, separate policy below by STEP 13B-21. This policy's effect therefore targets `trade` ONLY — it must NEVER target or modify `import-export` (see tests/commerce-trade-support-policy.test.js's dedicated Import-Export Protection test, D2). Read directly by src/engine/government/minister-interpretation.js::resolveMinistryForPolicy(), which never infers from sectorId for any policy, this one included."
+  },
+  {
+    "id": "policy-import-export-support-01",
+    "name": "สนับสนุนการนำเข้า-ส่งออก (STEP 13B-21)",
+    "sectorId": "import-export",
+    "cost": { "power": 1 },
+    "horizon": "mid",
+    "effects": [
+      { "domain": "sector", "target": "import-export", "metric": "health", "operation": "add", "value": 5 }
+    ],
+    "effectsValueStatus": "PROVISIONAL_IMPLEMENTATION: same deterministic +5/month example value as the existing 5 policies — this STEP's own explicit goal is closing the only completely-uncovered sector (import-export had no policy of any kind, primary or secondary, before this STEP — see STEP 13B-18's Finding F-01), not balance tuning; not a balanced gameplay number. NEW_PRODUCT_DECISION (STEP 13B-21, approved by controller via STEP 13B-18/19/20's own design-lock process): this policy deliberately declares NO secondary effect — STEP 13B-20's own comparison (no-secondary vs. a -1 `industry` secondary) found that, given the current 10-sector model, any secondary this policy could carry would necessarily either dilute an existing policy's own trade-off (by sharing a sector Industry-Labor already primaries) or compound an already-doubly-targeted sector (fiscal) — so the controller approved the no-secondary variant for this version, explicitly not ruled out for reconsideration in a future STEP.",
+    "primaryMinistryId": "foreign-customs",
+    "supportingMinistryIds": [],
+    "ministryMappingStatus": "EXPLICIT PRODUCT MAPPING (STEP 13B-21, implementing the locked PD-11 field contract, implementing the controller's own explicit direction for this STEP): `foreign-customs` -> `import-export` is an intentional, manually-authored assignment for THIS specific policy only — NOT an exact id match and NOT derived from any string-similarity/lexical inference rule (STEP 9A confirmed sectorId===ministryId inference fails to generalize for 7 of 10 sectors, and PD-11 explicitly forbids using it as a rule). `foreign-customs` was already reserved conceptually for `import-export` by PD-NEXT-GOV-06 (locked STEP 13B-10G), which deliberately narrowed `commerce` to `trade` only and left `import-export` for this ministry — this policy is the first real implementation of that reserved boundary, not a new interpretation of it. Read directly by src/engine/government/minister-interpretation.js::resolveMinistryForPolicy(), which never infers from sectorId for any policy, this one included."
+  }
+]
