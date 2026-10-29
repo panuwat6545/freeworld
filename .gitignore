@@ -1,0 +1,10 @@
+# Local CLI save data (src/ui/cli/play.js's default save path) — never commit a player's save.
+src/ui/cli/.freeworld-cli-save.json
+
+# Common local/editor/OS artifacts — none of these are produced by this project today, but a
+# contributor's own environment may generate them.
+node_modules/
+.DS_Store
+*.log
+.env
+.env.*

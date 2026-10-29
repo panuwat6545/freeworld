@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<!--
+  GitHub Pages project-site compatibility: this redirect is RELATIVE ("src/..."), never
+  absolute ("/src/..."). A GitHub Pages PROJECT site serves this repository under a subpath
+  (e.g. https://<owner>.github.io/freeworld/), so an absolute "/src/ui/browser/index.html"
+  resolves against the DOMAIN root and 404s. A relative path resolves against this file's own
+  directory (the site root, whatever subpath that actually is), which is correct both locally
+  and under any GitHub Pages project subpath. Verified directly — see
+  docs/PUBLIC-RELEASE-PREPARATION-REPORT.md and tests/github-pages-subpath.test.js.
+-->
+<meta http-equiv="refresh" content="0; url=src/ui/browser/index.html" />
+<title>FREEWORLD</title>
+</head>
+<body>
+<script>location.replace('src/ui/browser/index.html');</script>
+<p>Loading FREEWORLD… if you are not redirected, <a href="src/ui/browser/index.html">click here</a>.</p>
+</body>
+</html>
